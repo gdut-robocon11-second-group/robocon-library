@@ -20,6 +20,10 @@ target_compile_definitions(CMSISDSP PRIVATE
   ARM_MATH_CM4
   __FPU_PRESENT=1
 )
+target_link_libraries(CMSISDSP PRIVATE
+  ${TOOLCHAIN_LINK_LIBRARIES}
+  stm32cubemx
+)
 
 add_library(GDUT_RC_Library
   ${CMAKE_CURRENT_SOURCE_DIR}/BSP/bsp_can.cpp
@@ -34,7 +38,6 @@ target_link_libraries(GDUT_RC_Library PUBLIC
   STM32_Drivers
   ${TOOLCHAIN_LINK_LIBRARIES}
   FreeRTOS
-  tlsf
   CMSISDSP
 )
 target_compile_definitions(GDUT_RC_Library PUBLIC
