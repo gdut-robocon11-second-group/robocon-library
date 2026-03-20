@@ -286,6 +286,10 @@ public:
     std::copy_n(other.m_data, Rows * Cols, m_data);
   }
 
+  constexpr matrix(matrix &&other) noexcept {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
   explicit constexpr matrix(std::initializer_list<value_type> list) {
     assert(list.size() <= Rows * Cols &&
            "Initializer list size exceeds matrix capacity");
@@ -390,6 +394,10 @@ public:
   constexpr ~matrix() noexcept = default;
 
   constexpr matrix(const matrix &other) {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
+  constexpr matrix(matrix &&other) noexcept {
     std::copy_n(other.m_data, Rows * Cols, m_data);
   }
 

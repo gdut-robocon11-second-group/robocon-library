@@ -26,7 +26,7 @@ public:
   static constexpr matrix<float, 3, 4> inverse_kinematics_matrix{
       -0.176776695f,  0.176776695f,   0.176776695f,   -0.176776695f,
       0.176776695f,   0.176776695f,   -0.176776695f,  -0.176776695f,
-      0.25f * radius, 0.25f * radius, 0.25f * radius, 0.25f * radius};
+      0.25f / radius, 0.25f / radius, 0.25f / radius, 0.25f / radius};
 
   /*
    * @brief 计算机器人速度到轮速的转换
