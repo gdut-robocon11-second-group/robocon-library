@@ -83,37 +83,3 @@ while(true){
   HAL_Delay(10);
 }
 ```
-
-## 常见问题与调试
-
-- 返回 `0xFF` 或读到错误数据：
-  - 确认 `spi_proxy` 已正确初始化并绑定到正确的 `hspi`。
-  - 确认 SPI 配置为 LSB‑first（PS/2 要求）。
-  - 检查 `ATT` 线的时序：通信前需要拉低，结束后拉高。
-
-- 使用原生 PS/2（非 SPI 桥）时：
-  - `CMD` 与 `DAT` 通常为开漏信号，需外部 10k 上拉到 3.3V。不要同时驱动为高电平。
-
-- 时序问题：优先使用硬件 SPI，若必须使用 bit‑bang（当前驱动不支持），确保在低中断干扰或实时任务中运行以减少抖动。
-
-## 示例与测试
-
-- 仓库已包含示例与测试目标：`ps2_test`（模拟） 和 `ps2_hw_example`（硬件示例）。
-
-构建示例（在交叉编译环境下）：
-
-```bash
-mkdir -p build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=... ..
-cmake --build . --target ps2_hw_example
-```
-
-## 参考实现
-
-- 源码： [BSP/bsp_ps2.hpp](BSP/bsp_ps2.hpp), [BSP/bsp_ps2.cpp](BSP/bsp_ps2.cpp)
-- 相关模块： [BSP/bsp_spi.hpp](BSP/bsp_spi.hpp), [BSP/bsp_gpio_pin.hpp](BSP/bsp_gpio_pin.hpp)
-
-## 维护备注
-
-- 文档基于仓库实现时间：2026-03-25。当前驱动强制使用硬件 SPI。如需恢复软件 bit‑bang，请在 `exchange_byte()` 中添加帧时序实现并处理奇偶校验、超时与重试逻辑。
-
