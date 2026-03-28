@@ -12,7 +12,7 @@ namespace gdut {
 class spi_proxy; // forward declare optional SPI proxy
 
 /**
- * @brief PPS2手柄状态表示
+ * @brief PS2手柄状态表示
  */
 struct ps2_state {
   uint16_t buttons{0};
@@ -26,11 +26,11 @@ struct ps2_state {
 class ps2_controller : private uncopyable {
 public:
   struct pins_interface {
-    std::function<void(bool)> set_att;
-    std::function<void(bool)> write_cmd;
-    std::function<void(bool)> set_clk;
-    std::function<bool()> read_dat;
-    std::function<void(uint32_t)> delay_us;
+    gdut::function<void(bool)> set_att;
+    gdut::function<void(bool)> write_cmd;
+    gdut::function<void(bool)> set_clk;
+    gdut::function<bool()> read_dat;
+    gdut::function<void(uint32_t)> delay_us;
   };
 
   explicit ps2_controller(pins_interface pins, spi_proxy *spi);
@@ -43,7 +43,7 @@ public:
   void set_mode_digital();
   void set_mode_analog();
 
-  void on_change(std::function<void(const ps2_state &)> cb);
+  void on_change(gdut::function<void(const ps2_state &)> cb);
 
 private:
   uint8_t exchange_byte(uint8_t tx);
@@ -52,13 +52,13 @@ private:
 
   pins_interface m_pins;
   ps2_state m_state{};
-  std::function<void(const ps2_state &)> m_on_change;
+  gdut::function<void(const ps2_state &)> m_on_change;
 };
 
 template <typename Att, typename Cmd, typename Clk, typename Dat>
 ps2_controller
 make_ps2_controller(Att &att, Cmd &cmd, Clk &clk, Dat &dat,
-                    std::function<void(uint32_t)> delay_us,
+                    gdut::function<void(uint32_t)> delay_us,
                     spi_proxy *spi) {
   ps2_controller::pins_interface pins;
   pins.set_att = [&att](bool v) { att.write(v); };
