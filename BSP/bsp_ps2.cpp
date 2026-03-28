@@ -1,29 +1,32 @@
 #include "bsp_ps2.hpp"
+#include "bsp_spi.hpp"
 #include "stm32f4xx_hal.h"
-#include "../Components/clock.hpp"
 #include <array>
-#include <chrono>
-#include <thread>
+#include <cmsis_os2.h>
 
 namespace gdut {
 
 static void default_delay_us(uint32_t us) {
-  using namespace gdut;
   if (us == 0)
     return;
-  auto start = steady_clock::now();
-  auto target = start + steady_clock::duration(us);
-  // 对较大延时，适当让出调度以减少 CPU 占用
-  if (us >= 2000) {
-    std::this_thread::sleep_for(std::chrono::microseconds(us - 1000));
+  // 非阻塞优先：内核运行时仅使用 osDelay 让出 CPU。
+  // 小于 1ms 的延时在该路径下直接跳过，避免忙等占用线程。
+#if defined(__CMSIS_OS2)
+  if (osKernelGetState() == osKernelRunning) {
+    uint32_t sleep_ms = us / 1000;
+    if (sleep_ms > 0) {
+      osDelay(sleep_ms);
+    }
+    return;
   }
-  while (steady_clock::now() < target) {
-    // 忙等短循环，保证微秒级精度
-  }
+#endif
+
+  // 若 RTOS 未运行，默认实现不做忙等，避免阻塞。
+  (void)us;
 }
 
 ps2_controller::ps2_controller(pins_interface pins, spi_proxy *spi)
-    : m_pins(std::move(pins)), m_on_change(nullptr), m_spi(spi) {
+    : m_spi(spi), m_pins(pins), m_on_change(nullptr) {
   if (!m_pins.delay_us) {
     m_pins.delay_us = default_delay_us;
   }
@@ -41,15 +44,13 @@ void ps2_controller::init() {
 }
 
 uint8_t ps2_controller::exchange_byte(uint8_t tx) {
-  // Hardware SPI-only path. Transmit and receive a single byte.
   if (!m_spi) {
-    // Controller requires spi_proxy in constructor — return error sentinel.
     return 0xff;
   }
 
   uint8_t rx = 0;
-  // SPI proxy expects pointers; use a modest timeout
-  constexpr auto timeout = std::chrono::milliseconds(10);
+  // 非阻塞尝试：0ms 超时，SPI 忙时立即返回失败。
+  const auto timeout = std::chrono::milliseconds(0);
   if (m_spi->transmit_receive(&tx, &rx, 1, timeout)) {
     return rx;
   }
@@ -57,19 +58,27 @@ uint8_t ps2_controller::exchange_byte(uint8_t tx) {
   // If hardware SPI fails, return error sentinel
   return 0xff;
 }
-}
 
 bool ps2_controller::poll() {
   std::array<uint8_t, 9> tx = {0x01, 0x42, 0x00, 0x00, 0x00,
                                0x00, 0x00, 0x00, 0x00};
   std::array<uint8_t, 9> rx{};
 
+  if (!m_spi) {
+    return false;
+  }
+
   if (m_pins.set_att)
     m_pins.set_att(false);
   m_pins.delay_us(20);
 
-  for (size_t i = 0; i < tx.size(); ++i) {
-    rx[i] = exchange_byte(tx[i]);
+  // 非阻塞尝试：单次整帧传输，失败立即退出。
+  const auto timeout = std::chrono::milliseconds(0);
+  if (!m_spi->transmit_receive(tx.data(), rx.data(), static_cast<uint16_t>(tx.size()),
+                               timeout)) {
+    if (m_pins.set_att)
+      m_pins.set_att(true);
+    return false;
   }
 
   if (m_pins.set_att)
@@ -101,8 +110,8 @@ bool ps2_controller::poll() {
 
 ps2_state ps2_controller::read_state() const { return m_state; }
 
-void ps2_controller::on_change(std::function<void(const ps2_state &)> cb) {
-  m_on_change = std::move(cb);
+void ps2_controller::on_change(gdut::function<void(const ps2_state &)> cb) {
+  m_on_change = cb;
 }
 
 } // namespace gdut
