@@ -26,6 +26,46 @@ namespace gdut {
  */
 enum class gpio_port : uint8_t { A = 1, B, C, D, E, F, G, H, I };
 
+enum class gpio_mode : uint32_t {
+  input = GPIO_MODE_INPUT,
+  output = GPIO_MODE_OUTPUT_PP,
+  alternate_function_push_pull = GPIO_MODE_AF_PP,
+  alternate_function_open_drain = GPIO_MODE_AF_OD,
+  analog = GPIO_MODE_ANALOG
+};
+
+enum class gpio_pull : uint32_t {
+  no_pull = GPIO_NOPULL,
+  pull_up = GPIO_PULLUP,
+  pull_down = GPIO_PULLDOWN
+};
+
+enum class gpio_speed : uint32_t {
+  low = GPIO_SPEED_FREQ_LOW,
+  medium = GPIO_SPEED_FREQ_MEDIUM,
+  high = GPIO_SPEED_FREQ_HIGH,
+  very_high = GPIO_SPEED_FREQ_VERY_HIGH
+};
+
+enum class gpio_pin : uint32_t {
+  pin_0 = GPIO_PIN_0,
+  pin_1 = GPIO_PIN_1,
+  pin_2 = GPIO_PIN_2,
+  pin_3 = GPIO_PIN_3,
+  pin_4 = GPIO_PIN_4,
+  pin_5 = GPIO_PIN_5,
+  pin_6 = GPIO_PIN_6,
+  pin_7 = GPIO_PIN_7,
+  pin_8 = GPIO_PIN_8,
+  pin_9 = GPIO_PIN_9,
+  pin_10 = GPIO_PIN_10,
+  pin_11 = GPIO_PIN_11,
+  pin_12 = GPIO_PIN_12,
+  pin_13 = GPIO_PIN_13,
+  pin_14 = GPIO_PIN_14,
+  pin_15 = GPIO_PIN_15
+};
+
 [[nodiscard]] constexpr GPIO_TypeDef *get_gpio_port_ptr(uint32_t port) {
   switch (port) {
   case GPIOA_BASE:
