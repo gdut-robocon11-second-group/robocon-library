@@ -2,24 +2,33 @@
 #define BSP_PS2_HPP
 
 #include "bsp_gpio_pin.hpp"
+#include "bsp_spi.hpp"
 #include "uncopyable.hpp"
+
 #include <array>
 #include <cstdint>
-#include <functional>
 
 namespace gdut {
 
-class spi_proxy; // forward declare optional SPI proxy
-
 /**
- * @brief PS2手柄状态表示
+ * @brief PS2 手柄状态
+ *
+ * - buttons：16 位按键位图，1 表示按下，0 表示松开
+ *   bit0=Select, bit1=L3, bit2=R3, bit3=Start,
+ *   bit4=Up, bit5=Right, bit6=Down, bit7=Left,
+ *   bit8=L2, bit9=R2, bit10=L1, bit11=R1,
+ *   bit12=Triangle, bit13=Circle, bit14=Cross, bit15=Square
+ *
+ * - left_x / left_y：左摇杆原始坐标
+ * - right_x / right_y：右摇杆原始坐标
+ * - analog：是否处于模拟模式
  */
 struct ps2_state {
   uint16_t buttons{0};
-  int8_t lx{0};
-  int8_t ly{0};
-  int8_t rx{0};
-  int8_t ry{0};
+  uint8_t left_x{0};
+  uint8_t left_y{0};
+  uint8_t right_x{0};
+  uint8_t right_y{0};
   bool analog{false};
 };
 
@@ -27,10 +36,7 @@ class ps2_controller : private uncopyable {
 public:
   struct pins_interface {
     gdut::function<void(bool)> set_att;
-    gdut::function<void(bool)> write_cmd;
-    gdut::function<void(bool)> set_clk;
-    gdut::function<bool()> read_dat;
-    gdut::function<void(uint32_t)> delay_us;
+    gdut::function<void(uint32_t)> delay_ms;
   };
 
   explicit ps2_controller(pins_interface pins, spi_proxy *spi);
@@ -46,26 +52,21 @@ public:
   void on_change(gdut::function<void(const ps2_state &)> cb);
 
 private:
-  uint8_t exchange_byte(uint8_t tx);
+  bool transfer_frame(std::array<uint8_t, 9> &tx, std::array<uint8_t, 9> &rx);
+  void parse_state(const std::array<uint8_t, 9> &rx);
 
   spi_proxy *m_spi{nullptr};
-
   pins_interface m_pins;
   ps2_state m_state{};
   gdut::function<void(const ps2_state &)> m_on_change;
 };
 
-template <typename Att, typename Cmd, typename Clk, typename Dat>
-ps2_controller
-make_ps2_controller(Att &att, Cmd &cmd, Clk &clk, Dat &dat,
-                    gdut::function<void(uint32_t)> delay_us,
-                    spi_proxy *spi) {
+template <typename Att>
+ps2_controller make_ps2_controller(
+    Att &att, gdut::function<void(uint32_t)> delay_ms, spi_proxy *spi) {
   ps2_controller::pins_interface pins;
   pins.set_att = [&att](bool v) { att.write(v); };
-  pins.write_cmd = [&cmd](bool v) { cmd.write(v); };
-  pins.set_clk = [&clk](bool v) { clk.write(v); };
-  pins.read_dat = [&dat]() { return dat.read(); };
-  pins.delay_us = std::move(delay_us);
+  pins.delay_ms = std::move(delay_ms);
   return ps2_controller(std::move(pins), spi);
 }
 
