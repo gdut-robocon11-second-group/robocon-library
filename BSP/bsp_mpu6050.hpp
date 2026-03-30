@@ -9,7 +9,6 @@
 #include <chrono>
 #include <cmath>
 namespace gdut {
-
 /*
 MPU6050 I2C 地址
 MPU6050 的I2C从机地址由AD0引脚决定：
