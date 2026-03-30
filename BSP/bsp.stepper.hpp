@@ -21,7 +21,6 @@ namespace gdut {
  *   3. 必须开启 Update Interrupt（NVIC）
  *   4. DIR / ENABLE 仍为普通GPIO Output PP
  */
-template <typename DirPinType, typename EnablePinType>
 class pwm_stepper_motor : private uncopyable {
 public:
   /**
@@ -30,8 +29,8 @@ public:
    * @param step_timer   已配置为PWM的 timer 对象
    * @param pwm_channel  使用的PWM通道（TIM_CHANNEL_1~4）
    */
-  pwm_stepper_motor(DirPinType& dir_pin,
-                    EnablePinType& enable_pin,
+  pwm_stepper_motor(gpio_proxy& dir_pin,
+                    gpio_proxy& enable_pin,
                     timer& step_timer,
                     uint32_t pwm_channel = TIM_CHANNEL_1)
       : m_dir_pin(dir_pin),
@@ -60,7 +59,7 @@ public:
     }
     if (steps_per_sec > 50000) steps_per_sec = 50000;
 
-    // 假设定时器分辨率为 1us（CubeMX 中已配置好PSC）
+    // 强烈建议把定时器分辨率为 1us，这样计算非常简单：频率 = 1MHz / ARR
     uint32_t interval_us = 1000000ULL / steps_per_sec;
 
     auto* htim = m_step_timer.get_htim();
@@ -115,8 +114,8 @@ private:
     }
   }
 
-  DirPinType& m_dir_pin;
-  EnablePinType& m_enable_pin;
+  gpio_proxy& m_dir_pin;
+  gpio_proxy& m_enable_pin;
   timer& m_step_timer;
   uint32_t m_pwm_channel;
   uint32_t m_remaining_steps{0};

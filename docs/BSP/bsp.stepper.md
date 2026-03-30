@@ -1,4 +1,4 @@
-<DOCUMENT filename="bsp_stepper.md"># BSP 步进电机模块（bsp_stepper.hpp）
+# BSP 步进电机模块（bsp_stepper.hpp）
 
 ## 原理
 该模块为**42步进电机**（NEMA17/23 常用型号）提供高精度硬件PWM驱动封装。  
@@ -8,7 +8,7 @@ DIR和ENABLE仍使用普通GPIO控制，实现方向和使能管理。
 
 ## 实现思想
 - **硬件PWM + Update中断计数**：PWM通道负责高频STEP脉冲生成，定时器Update中断（每个完整脉冲触发一次）仅负责剩余步数计数，实现**非阻塞定步数运动**。
-- **模板参数**：`DirPinType`、`EnablePinType` 直接复用 `gdut::gpio_pin`，编译期确定引脚配置。
+- **gpio_proxy 适配**：DIR 和 ENABLE 引脚使用 `gdut::gpio_proxy` 代理对象（基于 `bsp_gpio_pin.hpp`）。
 - **RAII风格**：继承 `uncopyable`，禁止拷贝，避免硬件资源冲突。
 
 ## 如何使用
@@ -20,37 +20,43 @@ DIR和ENABLE仍使用普通GPIO控制，实现方向和使能管理。
 4. DIR 和 ENABLE 引脚配置为普通 **GPIO Output PP**。
 
 ### 2. 基础使用示例
+
 ```cpp
 #include "bsp_stepper.hpp"
 #include "bsp_gpio_pin.hpp"
 #include "bsp_timer.hpp"
 
-// 定义引脚（使用 gpio_pin 模板）
-using dir_pin = gdut::gpio_pin<gdut::gpio_port::B,
-                               GPIO_InitTypeDef{.Pin = GPIO_PIN_0,
-                                                .Mode = GPIO_MODE_OUTPUT_PP,
-                                                .Pull = GPIO_NOPULL,
-                                                .Speed = GPIO_SPEED_FREQ_HIGH}>;
-
-using enable_pin = gdut::gpio_pin<gdut::gpio_port::B,
-                                  GPIO_InitTypeDef{.Pin = GPIO_PIN_1,
-                                                   .Mode = GPIO_MODE_OUTPUT_PP,
-                                                   .Pull = GPIO_NOPULL,
-                                                   .Speed = GPIO_SPEED_FREQ_HIGH}>;
-
 // CubeMX 生成的定时器句柄（已配置为PWM）
 extern TIM_HandleTypeDef htim3;
 
-// 创建步进电机对象（使用TIM3的通道1）
-dir_pin    motor_dir;
-enable_pin motor_enable;
+// 创建 gpio_proxy 对象
+GPIO_InitTypeDef dir_init = {
+    .Pin   = GPIO_PIN_0,
+    .Mode  = GPIO_MODE_OUTPUT_PP,
+    .Pull  = GPIO_NOPULL,
+    .Speed = GPIO_SPEED_FREQ_HIGH
+};
+
+GPIO_InitTypeDef enable_init = {
+    .Pin   = GPIO_PIN_1,
+    .Mode  = GPIO_MODE_OUTPUT_PP,
+    .Pull  = GPIO_NOPULL,
+    .Speed = GPIO_SPEED_FREQ_HIGH
+};
+
+gdut::gpio_proxy motor_dir(GPIOA, &dir_init);     // 根据实际端口修改
+gdut::gpio_proxy motor_enable(GPIOA, &enable_init);
+
 gdut::timer step_timer(&htim3);
 
-gdut::pwm_stepper_motor<dir_pin, enable_pin> stepper(
-    motor_dir, motor_enable, step_timer, TIM_CHANNEL_1);
+// 创建步进电机对象
+gdut::pwm_stepper_motor stepper(motor_dir, motor_enable, step_timer, TIM_CHANNEL_1);
 
-#控制示例
+// ==================== 控制示例 ====================
 void stepper_demo() {
+    motor_dir.initialize();      // 初始化DIR引脚
+    motor_enable.initialize();   // 初始化ENABLE引脚
+
     stepper.enable(true);                    // 使能电机（低电平有效）
     stepper.set_direction(true);             // 正转
 
