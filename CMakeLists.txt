@@ -27,6 +27,7 @@ target_link_libraries(CMSISDSP PRIVATE
 
 add_library(GDUT_RC_Library
   ${CMAKE_CURRENT_SOURCE_DIR}/BSP/bsp_can.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BSP/bsp_ps2.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Third_Party/TLSF/tlsf.c
 )
 target_include_directories(GDUT_RC_Library PUBLIC
