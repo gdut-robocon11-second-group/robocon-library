@@ -61,7 +61,7 @@ extern SPI_HandleTypeDef hspi2;
 static gdut::spi_proxy ps2_spi(&hspi2);
 
 // 2) 准备 ATT 引脚（示例：你自己的 gpio pin 类，需提供 write(bool)）
-gdut::gpio_pin att_pin(/* ... */);
+gdut::gpio_proxy att_pin(/* ... */);
 
 // 3) 创建 PS2 控制器
 auto ps2 = gdut::make_ps2_controller(
