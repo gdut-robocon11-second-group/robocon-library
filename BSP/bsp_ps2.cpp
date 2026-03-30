@@ -131,7 +131,7 @@ bool ps2_controller::handshake() {
     (void)transfer_packet(tx, rx);
   }
 
-  // 5) 退出配置模式
+  // 4) 退出配置模式
   {
     const std::array<uint8_t, 9> tx{0x01, 0x43, 0x00, 0x00, 0x5A,
                                     0x5A, 0x5A, 0x5A, 0x5A};
@@ -140,7 +140,7 @@ bool ps2_controller::handshake() {
     }
   }
 
-  // 6) 再读一次状态确认
+  // 5) 再读一次状态确认
   {
     const std::array<uint8_t, 9> tx{0x01, 0x42, 0x00, 0x00, 0x00,
                                     0x00, 0x00, 0x00, 0x00};
