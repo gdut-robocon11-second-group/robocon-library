@@ -208,4 +208,4 @@ dma.init();
 - `start_receive()` 已标记为弃用（`[[deprecated]]`），请使用 `receive()` 替代
 - `dma_proxy` 不管理 `DMA_HandleTypeDef` 的内存，句柄的生命周期须由调用方保证
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_dma.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_dma.hpp)
+相关源码：[BSP/bsp_dma.hpp](../../BSP/bsp_dma.hpp)
