@@ -4,16 +4,18 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_i2c.h"
 #include "bsp_type_traits.hpp"
-#include "bsp_uncopyable.hpp"
-#include "bsp_functions.hpp"
+#include "uncopyable.hpp"
+#include "functions.hpp"
 
 #include <cstdint>
 #include <chrono>
 #include <functional>
 #include <utility>
+#include <limits>
 #include <algorithm>
 
-namespace gdut{
+
+namespace gdut {
 class i2c: private uncopyable {
 public:
 
@@ -140,8 +142,8 @@ public:
   }
   
   // 中止传输
-  HAL_StatusTypeDef abort() {
-    return m_hi2c ? HAL_I2C_Master_Abort_IT(m_hi2c, 0x00) : HAL_ERROR;
+  HAL_StatusTypeDef abort(uint16_t dev_addr) {
+    return m_hi2c ? HAL_I2C_Master_Abort_IT(m_hi2c, dev_addr) : HAL_ERROR;
   }
   
   // 获取状态
@@ -348,6 +350,14 @@ public:
     uint8_t idx = get_i2c_index(instance);
     if (idx < 3 && m_i2cs[idx]) {
       m_i2cs[idx]->call_master_rx_cplt_callback();
+    }
+  }
+  
+  // 主模式发送完成中断
+  static void handle_master_tx_cplt(I2C_TypeDef *instance) {
+    uint8_t idx = get_i2c_index(instance);
+    if (idx < 3 && m_i2cs[idx]) {
+      m_i2cs[idx]->call_master_tx_cplt_callback();
     }
   }
   
