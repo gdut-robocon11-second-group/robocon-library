@@ -2,6 +2,8 @@
 #define BSP_MPU6050_HPP
 
 #include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal_i2c.h"
+#include <cmsis_os2.h>
 #include "uncopyable.hpp"
 #include "bsp_iic.hpp"
 #include <cstdint>
@@ -9,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 namespace gdut {
+  using i2c=i2c;
 /*
 MPU6050 I2C 地址
 MPU6050 的I2C从机地址由AD0引脚决定：
@@ -303,7 +306,7 @@ public:
   }
 
   
-   //次性读取加速度计、陀螺仪和温度数据
+   //一次性读取加速度计、陀螺仪和温度数据
   struct imu_data {
     mpu6050_data accel;        // 加速度原始数据
     mpu6050_data gyro;         // 陀螺仪原始数据
@@ -382,11 +385,11 @@ public:
    */
   euler_angles get_filtered_euler_angles() {
     // 计算时间差 dt (秒)
-    auto now = std::chrono::steady_clock::now();
+    auto now = gdut::steady_clock::now();
     float dt = 0.01f;  // 默认10ms
     if (m_last_filter_time.time_since_epoch().count() > 0) {
       auto duration = now - m_last_filter_time;
-      dt = std::chrono::duration<float>(duration).count();
+      dt = gdut::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f;
       if (dt < 0.001f) dt = 0.001f;  // 最小1ms
       if (dt > 0.1f) dt = 0.1f;       // 最大100ms
     }
@@ -501,7 +504,7 @@ public:
     m_prev_roll = 0.0f;
     m_prev_pitch = 0.0f;
     m_prev_yaw = 0.0f;
-    m_last_filter_time = std::chrono::steady_clock::time_point();
+    m_last_filter_time = gdut::steady_clock::time_point();
   }
 
   /**
@@ -570,13 +573,21 @@ public:
   /**
    * 设置采样率
    * 采样率 = 1000 Hz / (1 + SMPLRT_DIV)
-   * sample_rate 采样率，单位为 Hz（1~1000）
+   * 
+   * SMPLRT_DIV 范围: [0, 255]，对应采样率范围约 [3.9Hz, 1000Hz]
+   * - 最高采样率: 1000Hz (SMPLRT_DIV=0)
+   * - 最低采样率: 1000/(1+255) ≈ 3.9Hz (SMPLRT_DIV=255)
+   * 
+   * @param sample_rate 采样率，单位为 Hz，范围约 [3.9, 1000]
+   *                    - 超过1000则设为1000
+   *                    - 低于3.9Hz的请求会被裁剪到3.9Hz
    */
   void set_sample_rate(uint16_t sample_rate) {
     if (sample_rate > 1000) sample_rate = 1000;
     if (sample_rate < 1) sample_rate = 1;
-    uint8_t div = static_cast<uint8_t>(1000 / sample_rate - 1);
-    write_register(mpu6050_reg::SMPLRT_DIV, div);
+    uint16_t div = 1000 / sample_rate - 1;  // 用 uint16_t 避免截断
+    if (div > 255) div = 255;  // 裁剪到寄存器允许的范围 [0, 255]
+    write_register(mpu6050_reg::SMPLRT_DIV, static_cast<uint8_t>(div));
   }
 
   /**
@@ -694,7 +705,7 @@ private:
   float m_prev_pitch{0.0f};                                     // 上一次的pitch角度 (弧度)
   float m_prev_yaw{0.0f};                                       // 上一次的yaw角度 (弧度) ← 陀螺仪积分
   float m_gyro_alpha{0.98f};                                    // 陀螺仪权重系数 [0.95-0.99]
-  std::chrono::steady_clock::time_point m_last_filter_time;   // 上一次滤波的时间
+  gdut::steady_clock::time_point m_last_filter_time;   // 上一次滤波的时间
   
   /**
    *  获取加速度计当前量程的 LSB/g 值
