@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmsis_os2.h>
 #include <cstdint>
+#include "stm32f4xx.h"
 
 namespace gdut {
 
@@ -33,7 +34,7 @@ struct system_clock {
   using period = duration::period;
   using time_point = std::chrono::time_point<system_clock>;
 
-  static constexpr bool is_steady = false;
+  static constexpr bool is_steady = true;
 
   static time_point now() noexcept {
     const uint32_t ticks = basic_kernel_clock::get_tick_count();
@@ -45,52 +46,46 @@ struct system_clock {
 };
 
 struct steady_clock {
-  using duration = std::chrono::microseconds;
-  using rep = duration::rep;
-  using period = duration::period;
+  // 需要与 system_stm32f4xx.c 中的 SystemCoreClock 定义保持一致
+  static constexpr uint32_t system_core_clock = 168000000;
+  static constexpr uint32_t system_tick_frequence = 1000;
+
+  using rep = int64_t;
+    // 分辨率 = 1 / system_core_clock 秒
+  using period = std::ratio<1, system_core_clock>;
+  using duration = std::chrono::duration<rep, period>;
   using time_point = std::chrono::time_point<steady_clock>;
 
   static constexpr bool is_steady = true;
 
   static time_point now() noexcept {
-    // 注意：此实现尽量保证单调，但仍依赖 CMSIS-RTOS2 底层端口对
-    // osKernelGetSysTimerCount()/osKernelGetTickCount() 的语义一致性。
-    // 在不同内核移植层上，不保证“绝对完全正确”。
-    //
-    // 最简单的 now()（仅示例，不推荐直接用于 delay_until）:
-    // static time_point now() noexcept {
-    //   const uint32_t freq = basic_kernel_clock::get_sys_timer_freq();
-    //   const uint32_t cnt = basic_kernel_clock::get_sys_timer_count();
-    //   const uint64_t us = (static_cast<uint64_t>(cnt) * duration::period::den) /
-    //                       (freq == 0U ? 1U : freq);
-    //   return time_point(duration(static_cast<rep>(us)));
-    // }
+    uint32_t irqmask = __get_PRIMASK();
+    __disable_irq();                     // 关中断，保证 tick 和 SysTick 读取原子性
 
-    const uint32_t tick_freq = basic_kernel_clock::get_tick_freq();
-    const uint32_t sys_freq = basic_kernel_clock::get_sys_timer_freq();
-    if (tick_freq == 0U || sys_freq == 0U) {
-      return time_point(duration(0));
+    // 获取 RTOS 滴答计数（32 位，单调递增，约 50 天回绕）
+    uint32_t tick = osKernelGetTickCount();
+
+    // 读取 SysTick 当前值（递减），转换为已过周期数
+    uint32_t load = SysTick->LOAD;
+    uint32_t elapsed = load - SysTick->VAL; // 当前滴答内已过的周期数
+
+    // 检查 SysTick 是否在读取期间发生溢出（即刚进入滴答中断）
+    if ((SysTick->CTRL >> 16) & 1U) {       // 溢出标志位
+      elapsed = load - SysTick->VAL;        // 重新读取，确保正确
+      tick++;                               // 补偿这一个滴答
     }
 
-    // 采样一致性：避免在 tick 边界把 tick 与子计数拼接错位
-    uint32_t tick0 = 0U;
-    uint32_t tick1 = 0U;
-    uint32_t sys = 0U;
-    do {
-      tick0 = basic_kernel_clock::get_tick_count();
-      sys = basic_kernel_clock::get_sys_timer_count();
-      tick1 = basic_kernel_clock::get_tick_count();
-    } while (tick0 != tick1);
+    // 每滴答的周期数 = LOAD + 1
+    const uint32_t interval = load + 1U;
 
-    const uint32_t counts_per_tick = (sys_freq + tick_freq / 2U) / tick_freq;
-    const uint32_t safe_counts_per_tick = counts_per_tick == 0U ? 1U : counts_per_tick;
+    // 计算总周期数（64 位）
+    uint64_t total = static_cast<uint64_t>(tick) * static_cast<uint64_t>(interval) + static_cast<uint64_t>(elapsed);
 
-    // 低位子计数（假设 osKernelGetSysTimerCount 与系统定时器同频）
-    const uint32_t sub_count = sys % safe_counts_per_tick;
-    const uint64_t total_counts =
-        static_cast<uint64_t>(tick1) * safe_counts_per_tick + sub_count;
-    const uint64_t us = (total_counts * duration::period::den) / sys_freq;
-    return time_point(duration(static_cast<rep>(us)));
+    if (irqmask == 0U) {
+      __enable_irq();
+    }
+
+    return time_point(duration(static_cast<int64_t>(total)));
   }
 };
 
