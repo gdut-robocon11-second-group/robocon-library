@@ -3,9 +3,9 @@
 
 #include "stm32f4xx.h"
 #include <chrono>
+#include <cmath>
 #include <cmsis_os2.h>
 #include <cstdint>
-#include <cmath>
 
 namespace gdut {
 
@@ -43,10 +43,9 @@ struct system_clock {
     if (freq == 0U) {
       return time_point{};
     }
-    const std::uint64_t ms64 =
-        (static_cast<std::uint64_t>(tick) * 1000ULL) / static_cast<std::uint64_t>(freq);
-    return time_point(
-        duration(static_cast<rep>(ms64)));
+    const std::uint64_t ms64 = (static_cast<std::uint64_t>(tick) * 1000ULL) /
+                               static_cast<std::uint64_t>(freq);
+    return time_point(duration(static_cast<rep>(ms64)));
   }
 };
 
@@ -59,15 +58,14 @@ struct steady_clock {
   static constexpr bool is_steady = true;
 
   static time_point now() noexcept {
-    uint32_t irqmask = __get_PRIMASK();
+    std::uint32_t irqmask = __get_PRIMASK();
     __disable_irq(); // 关中断，保证 tick 和 SysTick 读取原子性
 
     // 获取 RTOS 滴答计数（32 位，单调递增，约 50 天回绕）
-    uint32_t tick = basic_kernel_clock::get_tick_count();
-
+    std::uint32_t tick = basic_kernel_clock::get_tick_count();
     // 读取 SysTick 当前值（递减），转换为已过周期数
-    uint32_t load = SysTick->LOAD;
-    uint32_t elapsed = load - SysTick->VAL; // 当前滴答内已过的周期数
+    std::uint32_t load = SysTick->LOAD;
+    std::uint32_t elapsed = load - SysTick->VAL; // 当前滴答内已过的周期数
 
     // 检查 SysTick 是否在读取期间发生溢出（即刚进入滴答中断）
     if ((SysTick->CTRL >> 16) & 1U) { // 溢出标志位
@@ -76,15 +74,15 @@ struct steady_clock {
     }
 
     // 每滴答的周期数 = LOAD + 1
-    const uint32_t interval = load + 1U;
+    const std::uint32_t interval = load + 1U;
 
     // 计算总周期数（64 位）
-    uint64_t total =
-      static_cast<uint64_t>(tick) * static_cast<uint64_t>(interval) +
-      static_cast<uint64_t>(elapsed);
+    std::uint64_t total = static_cast<std::uint64_t>(tick) *
+                              static_cast<std::uint64_t>(interval) +
+                          static_cast<std::uint64_t>(elapsed);
 
     // 获取系统定时器频率并防止除零
-    const uint32_t freq = basic_kernel_clock::get_sys_timer_freq();
+    const std::uint32_t freq = basic_kernel_clock::get_sys_timer_freq();
     if (freq == 0U) {
       if (irqmask == 0U) {
         __enable_irq();
@@ -99,7 +97,8 @@ struct steady_clock {
       __enable_irq();
     }
 
-    return time_point(duration(static_cast<int64_t>(std::floor(total * ticks_per_second))));
+    return time_point(
+        duration(static_cast<rep>(std::floor(total * ticks_per_second))));
   }
 };
 
