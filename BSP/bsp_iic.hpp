@@ -4,15 +4,15 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_i2c.h"
 #include "bsp_type_traits.hpp"
+#include "function.hpp"
 #include "uncopyable.hpp"
-#include "functions.hpp"
 
 #include <cstdint>
 #include <chrono>
 #include <functional>
 #include <utility>
-#include <limits>
 #include <algorithm>
+#include <limits>
 
 
 namespace gdut {
