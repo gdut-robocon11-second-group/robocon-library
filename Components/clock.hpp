@@ -1,10 +1,10 @@
 #ifndef COMPONENTS_CLOCK_HPP
 #define COMPONENTS_CLOCK_HPP
 
+#include "stm32f4xx.h"
 #include <chrono>
 #include <cmsis_os2.h>
 #include <cstdint>
-#include "stm32f4xx.h"
 
 namespace gdut {
 
@@ -37,11 +37,8 @@ struct system_clock {
   static constexpr bool is_steady = true;
 
   static time_point now() noexcept {
-    const uint32_t ticks = basic_kernel_clock::get_tick_count();
-    const uint32_t freq = basic_kernel_clock::get_tick_freq();
-    const uint64_t ms = (static_cast<uint64_t>(ticks) * duration::period::den) /
-                        (freq == 0U ? 1U : freq);
-    return time_point(duration(static_cast<rep>(ms)));
+    return time_point(
+        duration(static_cast<rep>(basic_kernel_clock::get_tick_count())));
   }
 };
 
@@ -51,7 +48,7 @@ struct steady_clock {
   static constexpr uint32_t system_tick_frequence = 1000;
 
   using rep = int64_t;
-    // 分辨率 = 1 / system_core_clock 秒
+  // 分辨率 = 1 / system_core_clock 秒
   using period = std::ratio<1, system_core_clock>;
   using duration = std::chrono::duration<rep, period>;
   using time_point = std::chrono::time_point<steady_clock>;
@@ -60,7 +57,7 @@ struct steady_clock {
 
   static time_point now() noexcept {
     uint32_t irqmask = __get_PRIMASK();
-    __disable_irq();                     // 关中断，保证 tick 和 SysTick 读取原子性
+    __disable_irq(); // 关中断，保证 tick 和 SysTick 读取原子性
 
     // 获取 RTOS 滴答计数（32 位，单调递增，约 50 天回绕）
     uint32_t tick = osKernelGetTickCount();
@@ -70,16 +67,18 @@ struct steady_clock {
     uint32_t elapsed = load - SysTick->VAL; // 当前滴答内已过的周期数
 
     // 检查 SysTick 是否在读取期间发生溢出（即刚进入滴答中断）
-    if ((SysTick->CTRL >> 16) & 1U) {       // 溢出标志位
-      elapsed = load - SysTick->VAL;        // 重新读取，确保正确
-      tick++;                               // 补偿这一个滴答
+    if ((SysTick->CTRL >> 16) & 1U) { // 溢出标志位
+      elapsed = load - SysTick->VAL;  // 重新读取，确保正确
+      tick++;                         // 补偿这一个滴答
     }
 
     // 每滴答的周期数 = LOAD + 1
     const uint32_t interval = load + 1U;
 
     // 计算总周期数（64 位）
-    uint64_t total = static_cast<uint64_t>(tick) * static_cast<uint64_t>(interval) + static_cast<uint64_t>(elapsed);
+    uint64_t total =
+        static_cast<uint64_t>(tick) * static_cast<uint64_t>(interval) +
+        static_cast<uint64_t>(elapsed);
 
     if (irqmask == 0U) {
       __enable_irq();
