@@ -8,6 +8,8 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include "clock.hpp"
+
 namespace gdut {
 
 /*
@@ -383,11 +385,11 @@ public:
    */
   euler_angles get_filtered_euler_angles() {
     // 计算时间差 dt (秒)
-    auto now = std::chrono::steady_clock::now();
+    auto now = gdut::system_clock::now();
     float dt = 0.01f;  // 默认10ms
     if (m_last_filter_time.time_since_epoch().count() > 0) {
       auto duration = now - m_last_filter_time;
-      dt = std::chrono::duration<float>(duration).count();
+      dt = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f;
       if (dt < 0.001f) dt = 0.001f;  // 最小1ms
       if (dt > 0.1f) dt = 0.1f;       // 最大100ms
     }
@@ -502,7 +504,7 @@ public:
     m_prev_roll = 0.0f;
     m_prev_pitch = 0.0f;
     m_prev_yaw = 0.0f;
-    m_last_filter_time = std::chrono::steady_clock::time_point();
+    m_last_filter_time = gdut::system_clock::time_point();
   }
 
   /**
@@ -695,7 +697,7 @@ private:
   float m_prev_pitch{0.0f};                                     // 上一次的pitch角度 (弧度)
   float m_prev_yaw{0.0f};                                       // 上一次的yaw角度 (弧度) ← 陀螺仪积分
   float m_gyro_alpha{0.98f};                                    // 陀螺仪权重系数 [0.95-0.99]
-  std::chrono::steady_clock::time_point m_last_filter_time;   // 上一次滤波的时间
+  gdut::system_clock::time_point m_last_filter_time;   // 上一次滤波的时间
   
   /**
    *  获取加速度计当前量程的 LSB/g 值
