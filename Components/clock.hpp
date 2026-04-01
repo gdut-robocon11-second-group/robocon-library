@@ -35,7 +35,7 @@ struct system_clock {
   using period = duration::period;
   using time_point = std::chrono::time_point<system_clock>;
 
-  static constexpr bool is_steady = true;
+  static constexpr bool is_steady = false;
 
   static time_point now() noexcept {
     const std::uint32_t tick = basic_kernel_clock::get_tick_count();
@@ -43,9 +43,10 @@ struct system_clock {
     if (freq == 0U) {
       return time_point{};
     }
-    const std::uint32_t ms = (tick * 1000U) / freq;
+    const std::uint64_t ms64 =
+        (static_cast<std::uint64_t>(tick) * 1000ULL) / static_cast<std::uint64_t>(freq);
     return time_point(
-        duration(static_cast<rep>(ms)));
+        duration(static_cast<rep>(ms64)));
   }
 };
 
@@ -82,8 +83,17 @@ struct steady_clock {
       static_cast<uint64_t>(tick) * static_cast<uint64_t>(interval) +
       static_cast<uint64_t>(elapsed);
 
+    // 获取系统定时器频率并防止除零
+    const uint32_t freq = basic_kernel_clock::get_sys_timer_freq();
+    if (freq == 0U) {
+      if (irqmask == 0U) {
+        __enable_irq();
+      }
+      return time_point{};
+    }
+
     // 将周期数转换为秒，注意频率可能不整除 1 秒
-    double ticks_per_second = period::den / static_cast<double>(basic_kernel_clock::get_sys_timer_freq());
+    double ticks_per_second = period::den / static_cast<double>(freq);
 
     if (irqmask == 0U) {
       __enable_irq();
