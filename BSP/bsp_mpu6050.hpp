@@ -8,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <numbers>
 #include "clock.hpp"
 
 namespace gdut {
@@ -450,7 +451,7 @@ public:
     float gyro_z_dps = gyro_data.z / gyro_lsb;  // Z轴角速率 (°/s) ← 用于Yaw计算
     
     // 将陀螺仪数据转换为弧度
-    const float DEG_TO_RAD = 3.14159265f / 180.0f;
+    const float DEG_TO_RAD = std::numbers::pi_v<float> / 180.0f;
     float gyro_roll_rate = gyro_x_dps * DEG_TO_RAD;   // X轴陀螺仪 -> roll速率
     float gyro_pitch_rate = gyro_y_dps * DEG_TO_RAD;  // Y轴陀螺仪 -> pitch速率
     float gyro_yaw_rate = gyro_z_dps * DEG_TO_RAD;    // Z轴陀螺仪 -> yaw速率
@@ -519,7 +520,7 @@ public:
    * imu.reset_yaw(0.0f);
    * 
    * // 或者在已知方向时调用
-   * imu.reset_yaw(3.14159f / 4);  // 设定为45°方向
+   * imu.reset_yaw(std::numbers::pi_v<float> / 4);  // 设定为45°方向
    */
   void reset_yaw(float yaw_angle = 0.0f) {
     m_prev_yaw = yaw_angle;
