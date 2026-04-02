@@ -13,54 +13,57 @@
 
 namespace gdut {
 
-template <typename T, std::size_t Rows, std::size_t Cols>
+template <typename Mat, std::size_t Rows, std::size_t Cols>
 struct redefine_matrix {};
 
 template <std::size_t Rows, std::size_t Cols,
-          template <typename T, std::size_t, std::size_t> class Matrix,
-          typename Ty, std::size_t OtherRows, std::size_t OtherCols>
-struct redefine_matrix<Matrix<Ty, OtherRows, OtherCols>, Rows, Cols> {
-  using type = Matrix<Ty, Rows, Cols>;
+          template <typename, std::size_t, std::size_t> class Mat, typename Ty,
+          std::size_t OtherRows, std::size_t OtherCols>
+struct redefine_matrix<Mat<Ty, OtherRows, OtherCols>, Rows, Cols> {
+  using type = Mat<Ty, Rows, Cols>;
 };
 
-template <typename Derived, std::size_t Rows, std::size_t Cols>
-using redefine_matrix_t = typename redefine_matrix<Derived, Rows, Cols>::type;
+template <typename Mat, std::size_t Rows, std::size_t Cols>
+using redefine_matrix_t = typename redefine_matrix<Mat, Rows, Cols>::type;
 
-template <typename T> struct matrix_parameters {};
+template <typename Mat> struct matrix_parameters {};
 
-template <template <typename T, std::size_t, std::size_t> class Matrix,
+template <template <typename T, std::size_t, std::size_t> class Mat,
           typename Ty, std::size_t Rows, std::size_t Cols>
-struct matrix_parameters<Matrix<Ty, Rows, Cols>> {
+struct matrix_parameters<Mat<Ty, Rows, Cols>> {
   using value_type = Ty;
   static constexpr std::size_t row_value = Rows;
   static constexpr std::size_t col_value = Cols;
 };
 
-template <typename Derived, typename T, std::size_t Rows, std::size_t Cols>
-class base_matrix;
-
 template <typename Ty>
 inline constexpr bool is_scalar_v =
     std::is_integral_v<Ty> || std::is_floating_point_v<Ty>;
 
+template <typename Derived> class base_matrix {};
+
 template <typename Mat, typename = void> struct is_matrix : std::false_type {};
 
 template <typename Mat>
-struct is_matrix<Mat, std::void_t<typename matrix_parameters<Mat>::value_type>>
-    : std::bool_constant<std::is_base_of_v<
-          base_matrix<Mat, typename matrix_parameters<Mat>::value_type,
-                      matrix_parameters<Mat>::row_value,
-                      matrix_parameters<Mat>::col_value>,
-          Mat>> {};
+struct is_matrix<Mat, std::void_t<typename matrix_parameters<Mat>::value_type,
+                                  typename matrix_parameters<Mat>::row_value,
+                                  typename matrix_parameters<Mat>::col_value>>
+    : std::bool_constant<std::is_base_of_v<base_matrix<Mat>, Mat>> {};
 
 template <typename Mat>
 inline constexpr bool is_matrix_v = is_matrix<Mat>::value;
 
-template <typename Derived, typename T, std::size_t Rows, std::size_t Cols>
-class base_matrix {
-public:
-  using value_type = T;
+template <template <typename, std::size_t, std::size_t> class Matrix,
+          typename T, std::size_t Rows, std::size_t Cols>
+class base_matrix<Matrix<T, Rows, Cols>> {
+  static_assert(is_scalar_v<T>,
+                "Matrix value type must be a scalar (integral or floating-point)");
+  static_assert(Rows > 0, "Matrix must have at least one row");
+  static_assert(Cols > 0, "Matrix must have at least one column");
+  
+  using Derived = Matrix<T, Rows, Cols>;
 
+public:
   constexpr base_matrix() = default;
   constexpr ~base_matrix() noexcept = default;
   constexpr base_matrix(const base_matrix &) = default;
@@ -82,50 +85,50 @@ public:
   }
 
   template <typename Mat>
-  redefine_matrix_t<Derived, Rows, matrix_parameters<Mat>::col_value>
+  Matrix<T, Rows, matrix_parameters<Mat>::col_value>
   mult(const Mat &other) const {
     return get_derived()->mult_impl(other);
   }
 
-  value_type det() const {
+  T det() const {
     static_assert(Rows == Cols, "Determinant only defined for square matrices");
     if constexpr (Rows == 1) {
       return get_value(0, 0);
     } else if constexpr (Rows == 2) {
-      const value_type a = get_value(0, 0);
-      const value_type b = get_value(0, 1);
-      const value_type c = get_value(1, 0);
-      const value_type d = get_value(1, 1);
+      const T a = get_value(0, 0);
+      const T b = get_value(0, 1);
+      const T c = get_value(1, 0);
+      const T d = get_value(1, 1);
       return a * d - b * c;
     } else if constexpr (Rows == 3) {
-      const value_type a = get_value(0, 0);
-      const value_type b = get_value(0, 1);
-      const value_type c = get_value(0, 2);
-      const value_type d = get_value(1, 0);
-      const value_type e = get_value(1, 1);
-      const value_type f = get_value(1, 2);
-      const value_type g = get_value(2, 0);
-      const value_type h = get_value(2, 1);
-      const value_type i = get_value(2, 2);
+      const T a = get_value(0, 0);
+      const T b = get_value(0, 1);
+      const T c = get_value(0, 2);
+      const T d = get_value(1, 0);
+      const T e = get_value(1, 1);
+      const T f = get_value(1, 2);
+      const T g = get_value(2, 0);
+      const T h = get_value(2, 1);
+      const T i = get_value(2, 2);
       return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
     } else {
       constexpr std::size_t N = Rows;
-      value_type lu[N * N];
+      T lu[N * N];
       int sign = 1;
       std::copy_n(get(), N * N, lu);
 
       for (std::size_t k = 0; k < N; ++k) {
-        value_type max_val = std::abs(lu[k * N + k]);
+        T max_val = std::abs(lu[k * N + k]);
         std::size_t pivot = k;
         for (std::size_t i = k + 1; i < N; ++i) {
-          value_type val = std::abs(lu[i * N + k]);
+          T val = std::abs(lu[i * N + k]);
           if (val > max_val) {
             max_val = val;
             pivot = i;
           }
         }
-        if (max_val <= std::numeric_limits<value_type>::epsilon()) {
-          return static_cast<value_type>(0);
+        if (max_val <= std::numeric_limits<T>::epsilon()) {
+          return static_cast<T>(0);
         }
         if (pivot != k) {
           std::swap_ranges(lu + k * N, lu + (k + 1) * N, lu + pivot * N);
@@ -140,7 +143,7 @@ public:
         }
       }
 
-      value_type det = static_cast<value_type>(sign);
+      T det = static_cast<T>(sign);
       for (std::size_t i = 0; i < N; ++i) {
         det *= lu[i * N + i];
       }
@@ -151,7 +154,7 @@ public:
   bool is_invertible() const {
     static_assert(Rows == Cols,
                   "Invertibility only defined for square matrices");
-    return std::abs(det()) > std::numeric_limits<value_type>::epsilon();
+    return std::abs(det()) > std::numeric_limits<T>::epsilon();
   }
 
   Derived inverse() const {
@@ -159,8 +162,8 @@ public:
     return get_derived()->inverse_impl();
   }
 
-  value_type norm() const {
-    value_type sum = value_type{};
+  T norm() const {
+    T sum = T{};
     for (std::size_t i = 0; i < size(); ++i) {
       sum += get()[i] * get()[i];
     }
@@ -168,49 +171,47 @@ public:
   }
 
   Derived normalized() const {
-    value_type n = norm();
-    if (n <= std::numeric_limits<value_type>::epsilon()) {
+    T n = norm();
+    if (n <= std::numeric_limits<T>::epsilon()) {
       return *get_derived();
     }
-    return mult(static_cast<value_type>(1) / n);
+    return mult(static_cast<T>(1) / n);
   }
 
   redefine_matrix_t<Derived, Cols, Rows> transpose() const {
     return get_derived()->transpose_impl();
   }
 
-  value_type *get() { return get_derived()->get_impl(); }
+  T *get() { return get_derived()->get_impl(); }
 
-  const value_type *get() const { return get_derived()->get_impl(); }
+  const T *get() const { return get_derived()->get_impl(); }
 
   constexpr std::size_t size() const { return Rows * Cols; }
   constexpr std::size_t rows() const { return Rows; }
   constexpr std::size_t cols() const { return Cols; }
 
-  value_type &get_value(std::size_t i, std::size_t j) {
+  T &get_value(std::size_t i, std::size_t j) {
     return get_derived()->get_value_impl(i, j);
   }
 
-  const value_type &get_value(std::size_t i, std::size_t j) const {
+  const T &get_value(std::size_t i, std::size_t j) const {
     return get_derived()->get_value_impl(i, j);
   }
 
   auto get_handle() const { return get_derived()->get_handle_impl(); }
 
-  value_type &operator[](std::size_t i, std::size_t j) {
+  T &operator[](std::size_t i, std::size_t j) { return get_value(i, j); }
+
+  const T &operator[](std::size_t i, std::size_t j) const {
     return get_value(i, j);
   }
 
-  const value_type &operator[](std::size_t i, std::size_t j) const {
-    return get_value(i, j);
-  }
-
-  value_type &operator[](std::size_t i) {
+  T &operator[](std::size_t i) {
     static_assert(Cols == 1, "Single index operator only defined for vectors");
     return get_value(i, 0);
   }
 
-  const value_type &operator[](std::size_t i) const {
+  const T &operator[](std::size_t i) const {
     static_assert(Cols == 1, "Single index operator only defined for vectors");
     return get_value(i, 0);
   }
@@ -220,7 +221,7 @@ public:
                   "Identity matrix only defined for square matrices");
     Derived res;
     for (std::size_t i = 0; i < Rows; ++i) {
-      res.get_value(i, i) = static_cast<value_type>(1);
+      res.get_value(i, i) = static_cast<T>(1);
     }
     return res;
   }
@@ -275,9 +276,11 @@ template <typename T, std::size_t Rows, std::size_t Cols> class matrix {};
 
 template <std::size_t Rows, std::size_t Cols>
 class matrix<float, Rows, Cols>
-    : public base_matrix<matrix<float, Rows, Cols>, float, Rows, Cols> {
+    : public base_matrix<matrix<float, Rows, Cols>> {
 public:
-  using value_type = float;
+  using value_type = base_matrix<matrix<float, Rows, Cols>>::value_type;
+  static constexpr std::size_t row_value = Rows;
+  static constexpr std::size_t col_value = Cols;
 
   constexpr matrix() = default;
   constexpr ~matrix() noexcept = default;
@@ -303,7 +306,7 @@ public:
   }
 
 protected:
-  friend base_matrix<matrix<value_type, Rows, Cols>, value_type, Rows, Cols>;
+  friend base_matrix<matrix<value_type, Rows, Cols>>;
 
   matrix add_impl(const matrix &other) const {
     auto a = this->get_handle();
@@ -387,7 +390,7 @@ private:
 
 template <std::size_t Rows, std::size_t Cols>
 class matrix<double, Rows, Cols>
-    : public base_matrix<matrix<double, Rows, Cols>, double, Rows, Cols> {
+    : public base_matrix<matrix<double, Rows, Cols>> {
 public:
   using value_type = double;
   constexpr matrix() = default;
@@ -414,7 +417,7 @@ public:
   }
 
 protected:
-  friend base_matrix<matrix<value_type, Rows, Cols>, value_type, Rows, Cols>;
+  friend base_matrix<matrix<value_type, Rows, Cols>>;
 
   matrix add_impl(const matrix &other) const {
     auto a = this->get_handle();
@@ -526,9 +529,9 @@ inline constexpr vector<T, 3> cross(const vector<T, 3> &a,
 template <typename T>
 inline constexpr matrix<T, 4, 4> make_scale(std::type_identity_t<T> scale) {
   matrix<T, 4, 4> res;
-  for (std::size_t i = 0; i < 3; ++i) {
-    res[i, i] = scale;
-  }
+  res[0, 0] = scale;
+  res[1, 1] = scale;
+  res[2, 2] = scale;
   res[3, 3] = 1;
   return res;
 }
