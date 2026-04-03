@@ -28,8 +28,8 @@ using redefine_matrix_t = typename redefine_matrix<Mat, Rows, Cols>::type;
 
 template <typename Mat> struct matrix_parameters {};
 
-template <template <typename, std::size_t, std::size_t> class Mat,
-          typename Ty, std::size_t Rows, std::size_t Cols>
+template <template <typename, std::size_t, std::size_t> class Mat, typename Ty,
+          std::size_t Rows, std::size_t Cols>
 struct matrix_parameters<Mat<Ty, Rows, Cols>> {
   using value_type = Ty;
   static constexpr std::size_t row_value = Rows;
@@ -56,11 +56,12 @@ inline constexpr bool is_matrix_v = is_matrix<Mat>::value;
 template <template <typename, std::size_t, std::size_t> class Matrix,
           typename T, std::size_t Rows, std::size_t Cols>
 class base_matrix<Matrix<T, Rows, Cols>> {
-  static_assert(is_scalar_v<T>,
-                "Matrix value type must be a scalar (integral or floating-point)");
+  static_assert(
+      is_scalar_v<T>,
+      "Matrix value type must be a scalar (integral or floating-point)");
   static_assert(Rows > 0, "Matrix must have at least one row");
   static_assert(Cols > 0, "Matrix must have at least one column");
-  
+
   using Derived = Matrix<T, Rows, Cols>;
 
 public:
@@ -92,6 +93,8 @@ public:
 
   T det() const {
     static_assert(Rows == Cols, "Determinant only defined for square matrices");
+    // 对小矩阵使用 if constexpr 在编译期选择更快的展开公式，较大的矩阵使用LU分解计算行列式
+    // 行列式计算原理：https://zh.wikipedia.org/wiki/%E8%A1%8C%E5%88%97%E5%BC%8F
     if constexpr (Rows == 1) {
       return get_value(0, 0);
     } else if constexpr (Rows == 2) {
@@ -100,6 +103,7 @@ public:
       const T c = get_value(1, 0);
       const T d = get_value(1, 1);
       return a * d - b * c;
+
     } else if constexpr (Rows == 3) {
       const T a = get_value(0, 0);
       const T b = get_value(0, 1);
@@ -111,10 +115,30 @@ public:
       const T h = get_value(2, 1);
       const T i = get_value(2, 2);
       return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+
+    } else if constexpr (Rows == 4) {
+      const T *m = get();
+      T det = 0;
+      det += m[0] * (m[5] * m[10] * m[15] + m[6] * m[11] * m[13] +
+                     m[7] * m[9] * m[14] - m[5] * m[11] * m[14] -
+                     m[6] * m[9] * m[15] - m[7] * m[10] * m[13]);
+      det -= m[1] * (m[4] * m[10] * m[15] + m[6] * m[11] * m[12] +
+                     m[7] * m[8] * m[14] - m[4] * m[11] * m[14] -
+                     m[6] * m[8] * m[15] - m[7] * m[10] * m[12]);
+      det += m[2] *
+             (m[4] * m[9] * m[15] + m[5] * m[11] * m[12] + m[7] * m[8] * m[13] -
+              m[4] * m[11] * m[13] - m[5] * m[8] * m[15] - m[7] * m[9] * m[12]);
+      det -= m[3] *
+             (m[4] * m[9] * m[14] + m[5] * m[10] * m[12] + m[6] * m[8] * m[13] -
+              m[4] * m[10] * m[13] - m[5] * m[8] * m[14] - m[6] * m[9] * m[12]);
+      return det;
+
     } else {
+      // 使用LU分解计算行列式
+      // 参考原理：https://zh.wikipedia.org/wiki/LU%E5%88%86%E8%A7%A3
       constexpr std::size_t N = Rows;
       T lu[N * N];
-      int sign = 1;
+      T sign = static_cast<T>(1);
       std::copy_n(get(), N * N, lu);
 
       for (std::size_t k = 0; k < N; ++k) {
@@ -532,7 +556,7 @@ inline constexpr matrix<T, 4, 4> make_scale(std::type_identity_t<T> scale) {
   res[0, 0] = scale;
   res[1, 1] = scale;
   res[2, 2] = scale;
-  res[3, 3] = 1;
+  res[3, 3] = static_cast<T>(1);
   return res;
 }
 
@@ -542,17 +566,17 @@ inline constexpr matrix<T, 4, 4> make_translate(const vector<T, 3> &vec) {
   res[0, 3] = vec[0];
   res[1, 3] = vec[1];
   res[2, 3] = vec[2];
-  res[3, 3] = 1;
+  res[3, 3] = static_cast<T>(1);
   return res;
 }
 
 template <typename T>
-inline constexpr matrix<T, 4, 4> make_rotate(const vector<T, 3> &vec,
-                                             std::type_identity_t<T> angle) {
+inline constexpr matrix<T, 4, 4> make_rotate(const vector<T, 3> &axis,
+                                             std::type_identity_t<T> radian) {
   matrix<T, 4, 4> res;
-  vector<T, 3> temp = vec.normalized();
-  T c = std::cos(angle);
-  T s = std::sin(angle);
+  vector<T, 3> temp = axis.normalized();
+  T c = std::cos(radian);
+  T s = std::sin(radian);
   T osc = 1 - c;
   res[0, 0] = c + temp[0] * temp[0] * osc;
   res[0, 1] = temp[0] * temp[1] * osc - temp[2] * s;
@@ -563,7 +587,7 @@ inline constexpr matrix<T, 4, 4> make_rotate(const vector<T, 3> &vec,
   res[2, 0] = temp[2] * temp[0] * osc - temp[1] * s;
   res[2, 1] = temp[2] * temp[1] * osc + temp[0] * s;
   res[2, 2] = c + temp[2] * temp[2] * osc;
-  res[3, 3] = 1;
+  res[3, 3] = static_cast<T>(1);
   return res;
 }
 
