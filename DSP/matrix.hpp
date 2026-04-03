@@ -46,8 +46,8 @@ template <typename Mat, typename = void> struct is_matrix : std::false_type {};
 
 template <typename Mat>
 struct is_matrix<Mat, std::void_t<typename matrix_parameters<Mat>::value_type,
-                                  typename matrix_parameters<Mat>::row_value,
-                                  typename matrix_parameters<Mat>::col_value>>
+                                   decltype(matrix_parameters<Mat>::row_value),
+                                   decltype(matrix_parameters<Mat>::col_value)>>
     : std::bool_constant<std::is_base_of_v<base_matrix<Mat>, Mat>> {};
 
 template <typename Mat>
