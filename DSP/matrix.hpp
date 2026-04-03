@@ -93,7 +93,7 @@ public:
 
   T det() const {
     static_assert(Rows == Cols, "Determinant only defined for square matrices");
-    // 在编译期计算小矩阵的行列式以优化性能，较大的矩阵使用LU分解计算行列式
+    // 对小矩阵使用 if constexpr 在编译期选择更快的展开公式，较大的矩阵使用LU分解计算行列式
     // 行列式计算原理：https://zh.wikipedia.org/wiki/%E8%A1%8C%E5%88%97%E5%BC%8F
     if constexpr (Rows == 1) {
       return get_value(0, 0);
