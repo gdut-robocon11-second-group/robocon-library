@@ -28,7 +28,7 @@ using redefine_matrix_t = typename redefine_matrix<Mat, Rows, Cols>::type;
 
 template <typename Mat> struct matrix_parameters {};
 
-template <template <typename T, std::size_t, std::size_t> class Mat,
+template <template <typename, std::size_t, std::size_t> class Mat,
           typename Ty, std::size_t Rows, std::size_t Cols>
 struct matrix_parameters<Mat<Ty, Rows, Cols>> {
   using value_type = Ty;
@@ -46,8 +46,8 @@ template <typename Mat, typename = void> struct is_matrix : std::false_type {};
 
 template <typename Mat>
 struct is_matrix<Mat, std::void_t<typename matrix_parameters<Mat>::value_type,
-                                   decltype(matrix_parameters<Mat>::row_value),
-                                   decltype(matrix_parameters<Mat>::col_value)>>
+                                  decltype(matrix_parameters<Mat>::row_value),
+                                  decltype(matrix_parameters<Mat>::col_value)>>
     : std::bool_constant<std::is_base_of_v<base_matrix<Mat>, Mat>> {};
 
 template <typename Mat>
