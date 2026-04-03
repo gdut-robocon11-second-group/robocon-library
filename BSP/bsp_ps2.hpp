@@ -7,6 +7,7 @@
 #include "function.hpp"
 
 #include <utility>
+#include <span>
 #include <cstdint>
 
 namespace gdut {
@@ -54,9 +55,9 @@ public:
   void on_change(gdut::function<void(const ps2_state &)> cb);
 
 private:
-  bool transfer_frame(std::array<uint8_t, 9> &tx, std::array<uint8_t, 9> &rx);
-  void parse_state(const std::array<uint8_t, 9> &rx);
-  bool transfer_packet(const std::array<uint8_t, 9> &tx, std::array<uint8_t, 9> &rx);
+  bool transfer_frame(std::span<const uint8_t, 9> tx, std::span<uint8_t, 9> rx);
+  void parse_state(std::span<const uint8_t, 9> rx);
+  bool transfer_packet(std::span<const uint8_t, 9> tx, std::span<uint8_t, 9> rx);
 
   spi_proxy *m_spi{nullptr};
   pins_interface m_pins;
