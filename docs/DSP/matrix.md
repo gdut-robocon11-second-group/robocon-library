@@ -1,105 +1,125 @@
-# DSP 矩阵模块（matrix.hpp）
+# DSP 矩阵模块（`matrix.hpp`）
 
-## 原理
+## 概览
 
-该模块提供编译期确定维度的矩阵与向量类型，底层运算对接 ARM CMSIS-DSP 库（`arm_mat_*_f32` / `arm_mat_*_f64`），同时通过 CRTP 基类 `base_matrix` 统一提供行列式、逆矩阵、转置、范数等纯 C++ 实现的高层接口。所有维度信息和类型检查均在编译期完成，运行期零开销。
+这个模块提供编译期固定维度的矩阵和向量类型，位于 `namespace gdut`。实现方式是：
 
-## 核心设计
+- 以 `matrix<T, Rows, Cols>` 作为核心类型
+- 以 `vector<T, Rows>` 作为列向量别名
+- 对 `float` 和 `double` 两个特化版本，底层分别对接 CMSIS-DSP 的 `arm_mat_*_f32` 和 `arm_mat_*_f64`
+- 通过 CRTP 基类 `base_matrix<Matrix<T, Rows, Cols>>` 提供通用接口
 
-### CRTP 基类 `base_matrix<Derived, T, Rows, Cols>`
+矩阵数据存放在栈上定长数组中，采用行优先（row-major）布局，尺寸和类型约束都在编译期完成。
 
-所有矩阵类继承自此基类。基类通过 CRTP 调用派生类的 `*_impl` 函数，实现静态多态，避免虚函数开销。
+## 设计结构
+
+### `base_matrix<Derived>`
+
+`base_matrix` 是一个 CRTP 基类，派生类需要实现若干 `*_impl` 接口，基类再统一提供高层 API。
+
+当前基类对外提供的能力包括：
 
 | 功能 | 方法 | 说明 |
 |------|------|------|
-| 加法 | `add(other)` / `+` | 同形矩阵逐元素相加 |
-| 减法 | `sub(other)` / `-` | 同形矩阵逐元素相减 |
-| 矩阵乘法 | `mult(other)` / `*` | `(M×K) * (K×N) → (M×N)` |
-| 标量乘法 | `mult(scalar)` / `*` | 矩阵每个元素乘以标量 |
-| 行列式 | `det()` | 仅方阵，见下方算法说明 |
-| 可逆判断 | `is_invertible()` | `|det| > epsilon` |
-| 逆矩阵 | `inverse()` | 仅方阵，底层调用 CMSIS-DSP |
-| 转置 | `transpose()` | 返回 `(Cols×Rows)` 新矩阵 |
-| 范数 | `norm()` | Frobenius 范数 $\|\mathbf{A}\|_F = \sqrt{\sum a_{ij}^2}$ |
-| 归一化 | `normalized()` | 返回 `this / norm()` 的新矩阵（按 Frobenius 范数归一化），`norm() > epsilon` 时执行除法，否则返回原矩阵副本 |
-| 单位矩阵 | `identity()` | 静态方法，仅方阵 |
-| 元素访问 | `operator[](i, j)` | C++23 多维下标（行，列），零起始 |
-| 原始指针 | `get()` | 返回行优先存储的数据指针 |
-| CMSIS 句柄 | `get_handle()` | 返回 `arm_matrix_instance_f32/f64` |
+| 加法 | `add(other)` / `+` | 同维度矩阵逐元素相加 |
+| 减法 | `sub(other)` / `-` | 同维度矩阵逐元素相减 |
+| 标量乘法 | `mult(scalar)` / `*` | 每个元素乘以标量 |
+| 矩阵乘法 | `mult(other)` / `*` | `(M×K) * (K×N) -> (M×N)` |
+| 行列式 | `det()` | 仅方阵可用 |
+| 可逆判断 | `is_invertible()` | 使用 `|det| > epsilon` 判断 |
+| 逆矩阵 | `inverse()` | 仅方阵可用，交给 CMSIS-DSP 求逆 |
+| 转置 | `transpose()` | 返回转置后的新矩阵 |
+| 范数 | `norm()` | Frobenius 范数 |
+| 归一化 | `normalized()` | 按 Frobenius 范数归一化，范数过小时直接返回自身副本 |
+| 单位矩阵 | `identity()` | 静态成员函数，仅方阵可用 |
+| 元素访问 | `get_value(i, j)` / `operator[](i, j)` | 二维访问，零起始 |
+| 向量访问 | `operator[](i)` | 仅列向量可用 |
+| 原始数据 | `get()` | 返回内部数组指针 |
+| CMSIS 句柄 | `get_handle()` | 返回对应的 `arm_matrix_instance_f32/f64` |
 
 ### `matrix<T, Rows, Cols>`
 
-具体矩阵类，目前特化了两种浮点类型：
+`matrix` 只有两个实际可用的特化：
 
-- `matrix<float, Rows, Cols>`：底层调用 `arm_mat_*_f32`
-- `matrix<double, Rows, Cols>`：底层调用 `arm_mat_*_f64`
+- `matrix<float, Rows, Cols>`
+- `matrix<double, Rows, Cols>`
 
-数据以行优先（row-major）顺序存储于栈上数组 `m_data[Rows * Cols]`，零初始化。
+其它类型的主模板只是占位声明，不提供实际成员。
+
+构造和存储特性：
+
+- 默认构造后数据为零初始化
+- 支持用 `std::initializer_list` 进行线性初始化
+- 数据按行优先顺序存储在 `m_data[Rows * Cols]` 中
+- `get_handle()` 返回的 CMSIS 句柄直接指向内部数据
 
 ### `vector<T, Rows>`
 
 ```cpp
-template<typename T, std::size_t Rows>
+template <typename T, std::size_t Rows>
 using vector = matrix<T, Rows, 1>;
 ```
 
-列向量是 `matrix<T, Rows, 1>` 的别名。对于列向量，可使用单下标访问 `v[i]`（等同于 `v[i, 0]`）。
+也就是说，向量本质上是列矩阵。对向量可使用单下标访问 `v[i]`，它等价于 `v[i, 0]`。
 
 ### 行列式算法
 
 | 维度 | 算法 |
 |------|------|
-| 1×1 | 直接返回元素 |
-| 2×2 | $ad - bc$ |
-| 3×3 | Sarrus 展开式 |
-| N×N (N≥4) | 带部分主元选取的 LU 分解，时间复杂度 $O(N^3)$ |
+| `1 × 1` | 直接返回元素 |
+| `2 × 2` | `ad - bc` |
+| `3 × 3` | 按展开式直接计算 |
+| `4 × 4` | 展开后的显式公式 |
+| `N × N`，`N >= 5` | 带部分主元选取的 LU 分解，复杂度 `O(N^3)` |
 
-## 向量运算
+## 向量与变换函数
+
+### 点积与叉积
 
 ```cpp
-// 点积（返回标量）
-T dot(const vector<T, N>& a, const vector<T, N>& b);
-T operator*(const vector<T, N>& a, const vector<T, N>& b);  // 同上
-
-// 叉积（仅 3D 向量）
+T dot(const vector<T, Rows>& a, const vector<T, Rows>& b);
+T operator*(const vector<T, Rows>& a, const vector<T, Rows>& b);
 vector<T, 3> cross(const vector<T, 3>& a, const vector<T, 3>& b);
 ```
 
-## 3D 变换辅助函数（齐次坐标，4×4）
+- `dot` 和 `vector * vector` 都表示点积
+- `cross` 只对 3 维向量提供叉积
 
-所有变换函数返回 `matrix<T, 4, 4>`，用于齐次坐标下的仿射变换，可直接右乘 `vector<T, 4>`（最后分量为 `1`）。
+### 4×4 变换矩阵
 
-| 函数 | 说明 |
-|------|------|
-| `make_scale<T>(s)` | 均匀缩放，前三个对角元素为 `s`，`[3,3]` 为 `1` |
-| `make_translate(vec)` | 平移，基于单位矩阵，`[0..2, 3]` 填入 `vec` 分量 |
-| `make_rotate(axis, angle)` | 绕轴 `axis` 旋转 `angle` 弧度（Rodrigues 公式），函数内部自动对 `axis` 归一化 |
+```cpp
+matrix<T, 4, 4> make_scale(std::type_identity_t<T> scale);
+matrix<T, 4, 4> make_translate(const vector<T, 3>& vec);
+matrix<T, 4, 4> make_rotate(const vector<T, 3>& axis, std::type_identity_t<T> radian);
+```
 
-变换矩阵组合遵循**右乘**规则：
+这些函数都返回 `matrix<T, 4, 4>`：
+
+- `make_scale`：均匀缩放，前三个对角元素为缩放值，右下角为 `1`
+- `make_translate`：平移矩阵，基于单位矩阵，在最后一列填入位移
+- `make_rotate`：绕任意轴旋转，内部会先对轴向量做归一化，再套用 Rodrigues 公式
+
+组合变换时使用右乘约定：
 
 $$\mathbf{v}' = M_{\text{translate}} \cdot M_{\text{rotate}} \cdot M_{\text{scale}} \cdot \mathbf{v}$$
 
-## 如何使用
+## 使用示例
 
 ### 基本矩阵运算
 
 ```cpp
 #include "matrix.hpp"
 
-// 构造 3×4 矩阵（行优先初始化列表）
-gdut::dsp::matrix<float, 3, 4> a{1, 2, 3, 4,
-                                  5, 6, 7, 8,
-                                  9,10,11,12};
+gdut::matrix<float, 3, 4> a{1, 2, 3, 4,
+                            5, 6, 7, 8,
+                            9, 10, 11, 12};
 
-// 矩阵乘法（编译期验证维度）
-gdut::dsp::matrix<float, 4, 2> b{1,2,3,4,5,6,7,8};
-auto c = a * b;  // 结果类型：matrix<float, 3, 2>
+gdut::matrix<float, 4, 2> b{1, 2, 3, 4, 5, 6, 7, 8};
+auto c = a * b;
 
-// 标量乘法
 auto d = c * 2.0f;
 auto e = 2.0f * c;
 
-// 加减法
 auto f = c + d;
 auto g = c - d;
 ```
@@ -107,71 +127,59 @@ auto g = c - d;
 ### 方阵操作
 
 ```cpp
-auto m = gdut::dsp::matrix<float, 3, 3>{1, 2, 3,
-                                         0, 1, 4,
-                                         5, 6, 0};
+auto m = gdut::matrix<float, 3, 3>{1, 2, 3,
+                                   0, 1, 4,
+                                   5, 6, 0};
 
-// 行列式
-float d = m.det();
+float det_value = m.det();
 
-// 可逆性检查
 if (m.is_invertible()) {
     auto inv = m.inverse();
-    auto eye = m * inv;  // 近似单位矩阵
+    auto eye = m * inv;
 }
 
-// 转置
-auto t = m.transpose();  // 类型：matrix<float, 3, 3>
-
-// 单位矩阵
-auto i = gdut::dsp::matrix<float, 4, 4>::identity();
+auto t = m.transpose();
+auto i = gdut::matrix<float, 4, 4>::identity();
 ```
 
 ### 元素访问
 
 ```cpp
-auto m = gdut::dsp::matrix<float, 2, 3>{1,2,3,4,5,6};
+auto m = gdut::matrix<float, 2, 3>{1, 2, 3, 4, 5, 6};
 
-// 二维下标（C++23 多维 operator[]）
-float val = m[0, 2];   // 第0行第2列 → 3
+float val = m[0, 2];
 m[1, 0] = 10.0f;
 
-// const 访问
 const auto& cm = m;
-float cval = cm[1, 2];  // → 6
+float cval = cm[1, 2];
 ```
 
 ### 向量与叉积
 
 ```cpp
-using vec3f = gdut::dsp::vector<float, 3>;
+using vec3f = gdut::vector<float, 3>;
 
-vec3f a{1.0f, 0.0f, 0.0f};
-vec3f b{0.0f, 1.0f, 0.0f};
+vec3f x{1.0f, 0.0f, 0.0f};
+vec3f y{0.0f, 1.0f, 0.0f};
 
-float dp = gdut::dsp::dot(a, b);   // 0.0f
-vec3f cp = gdut::dsp::cross(a, b); // {0, 0, 1}
+float dp = gdut::dot(x, y);
+vec3f cp = gdut::cross(x, y);
 
-float norm = a.norm();  // 1.0f
+float n = x.norm();
 ```
 
 ### 3D 变换
 
 ```cpp
 #include <numbers>
-using namespace gdut::dsp;
 
-// 缩放 5 倍
+using namespace gdut;
+
 auto s = make_scale<float>(5.0f);
-
-// 平移 (1, 2, 3)
 auto t = make_translate(vector<float, 3>{1.0f, 2.0f, 3.0f});
-
-// 绕 Y 轴旋转 π/2 弧度（轴向量无需预先归一化）
 auto r = make_rotate(vector<float, 3>{0.0f, 1.0f, 0.0f},
                      std::numbers::pi_v<float> / 2.0f);
 
-// 组合变换：先缩放，再旋转，再平移
 vector<float, 4> v{1.0f, 1.0f, 1.0f, 1.0f};
 auto result = t * r * s * v;
 ```
@@ -179,45 +187,40 @@ auto result = t * r * s * v;
 ### 与 CMSIS-DSP 互操作
 
 ```cpp
-auto m = gdut::dsp::matrix<float, 3, 3>::identity();
+auto m = gdut::matrix<float, 3, 3>::identity();
 
-// 获取 arm_matrix_instance_f32，可传入其他 CMSIS 函数
 auto handle = m.get_handle();
-// handle.pData 指向内部数组，handle.numRows/numCols 已设置
-
-// 获取原始数据指针
 float* data = m.get();
 ```
 
 ### 使用 double 精度
 
 ```cpp
-auto dm = gdut::dsp::matrix<double, 4, 4>::identity();
-auto dinv = dm.inverse();  // 调用 arm_mat_inverse_f64
+auto dm = gdut::matrix<double, 4, 4>::identity();
+auto dinv = dm.inverse();
 ```
 
-## 实现注意事项
+## 设计细节
 
-- **支持类型**：目前仅特化 `float` 和 `double`。对其他类型实例化会得到空的 `matrix<T, R, C>` 类（无任何成员）。
-- **维度检查**：矩阵乘法 `operator*` 在编译期通过 `static_assert` 检查 `A.cols == B.rows` 及两矩阵元素类型一致。
-- **内存布局**：行优先（row-major）存储，与 CMSIS-DSP 约定一致。
-- **`make_rotate` 轴向量自动归一化**：函数内部会调用 `normalized()` 对传入的 `axis` 进行归一化，因此传入任意非零方向向量均可，但传入零向量将导致除以零（结果未定义）。
-- **`inverse()` 精度**：`float` 精度较低，建议在精度敏感场景使用 `double` 版本。
-- **`det()` for N≥4**：使用带部分主元的 LU 分解，当主元绝对值 ≤ `epsilon` 时提前返回 `0`（奇异矩阵）。
+- **命名空间**：主实现位于 `gdut`
+- **支持类型**：只对 `float` 和 `double` 提供完整实现
+- **维度检查**：矩阵乘法会在编译期检查左矩阵列数和右矩阵行数是否匹配，并检查元素类型一致
+- **内存布局**：行优先布局，与 CMSIS-DSP 兼容
+- **`operator[]`**：二维访问使用 C++23 的多参数下标语法；向量还支持单参数访问
+- **`make_rotate`**：会自动对轴向量做归一化，零向量属于未定义输入
+- **`inverse()`**：底层直接调用 CMSIS-DSP 的求逆接口，浮点精度不足时建议使用 `double`
+- **`det()`**：高维方阵使用带部分主元的 LU 分解，若主元接近 0 会提前返回 0
 
 ## 类型特征工具
 
-模块内提供以下辅助元函数，可用于泛型约束：
-
 ```cpp
-// 检查类型是否为标量（整型或浮点型）
-gdut::dsp::is_scalar_v<T>
-
-// 检查类型是否为 matrix 家族
-gdut::dsp::is_matrix_v<Mat>
-
-// 将 matrix<T, R, C> 的维度替换为 (NewR, NewC)
-gdut::dsp::redefine_matrix_t<Mat, NewRows, NewCols>
+gdut::is_scalar_v<T>
+gdut::is_matrix_v<Mat>
+gdut::redefine_matrix_t<Mat, NewRows, NewCols>
 ```
 
-相关源码：[Middlewares/GDUT_RC_Library/DSP/matrix.hpp](../../Middlewares/GDUT_RC_Library/DSP/matrix.hpp)
+- `is_scalar_v<T>`：判断是否为整型或浮点型
+- `is_matrix_v<Mat>`：判断是否为当前矩阵体系中的类型
+- `redefine_matrix_t<Mat, NewRows, NewCols>`：保留原值类型，只替换矩阵维度
+
+相关源码：[DSP/matrix.hpp](../../DSP/matrix.hpp)
