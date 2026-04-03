@@ -171,16 +171,15 @@ float n = x.norm();
 ### 3D 变换
 
 ```cpp
+#include "matrix.hpp"
 #include <numbers>
 
-using namespace gdut;
+auto s = gdut::make_scale<float>(5.0f);
+auto t = gdut::make_translate(gdut::vector<float, 3>{1.0f, 2.0f, 3.0f});
+auto r = gdut::make_rotate(gdut::vector<float, 3>{0.0f, 1.0f, 0.0f},
+                           std::numbers::pi_v<float> / 2.0f);
 
-auto s = make_scale<float>(5.0f);
-auto t = make_translate(vector<float, 3>{1.0f, 2.0f, 3.0f});
-auto r = make_rotate(vector<float, 3>{0.0f, 1.0f, 0.0f},
-                     std::numbers::pi_v<float> / 2.0f);
-
-vector<float, 4> v{1.0f, 1.0f, 1.0f, 1.0f};
+gdut::vector<float, 4> v{1.0f, 1.0f, 1.0f, 1.0f};
 auto result = t * r * s * v;
 ```
 

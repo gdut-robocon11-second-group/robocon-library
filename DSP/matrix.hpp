@@ -93,6 +93,8 @@ public:
 
   T det() const {
     static_assert(Rows == Cols, "Determinant only defined for square matrices");
+    // 在编译期计算小矩阵的行列式以优化性能，较大的矩阵使用LU分解计算行列式
+    // 行列式计算原理：https://zh.wikipedia.org/wiki/%E8%A1%8C%E5%88%97%E5%BC%8F
     if constexpr (Rows == 1) {
       return get_value(0, 0);
     } else if constexpr (Rows == 2) {
@@ -132,6 +134,8 @@ public:
       return det;
 
     } else {
+      // 使用LU分解计算行列式
+      // 参考原理：https://zh.wikipedia.org/wiki/LU%E5%88%86%E8%A7%A3
       constexpr std::size_t N = Rows;
       T lu[N * N];
       T sign = static_cast<T>(1);
