@@ -2,73 +2,84 @@
 #define GPIO_PIN_HPP
 
 #include "bsp_utility.hpp"
+#include "stm32f407xx.h"
 #include "stm32f4xx_hal.h"
 
 #include "uncopyable.hpp"
+#include <cstdint>
+#include <utility>
 
 namespace gdut {
 
-/**
- * @brief GPIO 引脚的编译期配置标签
- * @tparam Port GPIO 端口（A-I）
- * @tparam InitStruct HAL GPIO 初始化结构体
- */
-template <gpio_port Port, GPIO_InitTypeDef InitStruct> struct gpio_pin_tag {
-  static constexpr gpio_port port = Port;
-  static constexpr GPIO_InitTypeDef init_struct = InitStruct;
-};
-
-/**
- * @brief HAL GPIO 引脚的 RAII 包装
- *
- * 该类提供编译期配置的 GPIO 引脚管理。
- * 构造时初始化，引脚析构时反初始化。
- *
- * 特性：
- * - 通过模板参数进行编译期配置
- * - RAII 资源管理
- * - 类型安全的端口和引脚选择
- * - 不可拷贝（硬件资源）
- *
- * 使用示例：
- *   gdut::gpio_pin<gdut::gpio_port::A,
- *                  GPIO_InitTypeDef{.Pin = GPIO_PIN_5,
- *                                   .Mode = GPIO_MODE_OUTPUT_PP}> led;
- *   led.write(true);  // 置高
- *
- * @tparam Port GPIO 端口（A-I）
- * @tparam InitStruct HAL GPIO 初始化结构体
- */
-template <gpio_port Port, GPIO_InitTypeDef InitStruct>
-class gpio_pin : private uncopyable {
+class gpio_proxy : private uncopyable {
 public:
-  using tag_type = gpio_pin_tag<Port, InitStruct>;
-
-  gpio_pin() {
-    GPIO_InitTypeDef init_struct = tag_type::init_struct;
-    HAL_GPIO_Init(get_gpio_port_ptr(tag_type::port), &init_struct);
+  gpio_proxy(GPIO_TypeDef *Port, GPIO_InitTypeDef *InitStruct)
+      : m_gpio_port(Port), m_init_struct(InitStruct) {
+    // initialize();
   }
 
-  ~gpio_pin() {
-    HAL_GPIO_DeInit(get_gpio_port_ptr(tag_type::port),
-                    tag_type::init_struct.Pin);
+  gpio_proxy(gpio_proxy &&pin) noexcept
+      : m_gpio_port(pin.m_gpio_port), m_init_struct(pin.m_init_struct) {
+    pin.m_gpio_port = nullptr;
+    pin.m_init_struct = nullptr;
+  }
+
+  gpio_proxy &operator=(gpio_proxy &&pin) noexcept {
+    if (this != &pin) {
+      m_gpio_port = pin.m_gpio_port;
+      m_init_struct = pin.m_init_struct;
+      pin.m_gpio_port = nullptr;
+      pin.m_init_struct = nullptr;
+    }
+    return *this;
+  }
+
+  void initialize() { HAL_GPIO_Init(m_gpio_port, m_init_struct); }
+
+  void deinitialize() { HAL_GPIO_DeInit(m_gpio_port, m_init_struct->Pin); }
+
+  void set_mode(gpio_mode mode) {
+    m_init_struct->Mode = std::to_underlying(mode);
+    HAL_GPIO_Init(m_gpio_port, m_init_struct);
+  }
+
+  void set_pull(gpio_pull pull) {
+    m_init_struct->Pull = std::to_underlying(pull);
+    HAL_GPIO_Init(m_gpio_port, m_init_struct);
+  }
+
+  void set_alternate(uint32_t alternate) {
+    m_init_struct->Pull = alternate;
+    HAL_GPIO_Init(m_gpio_port, m_init_struct);
+  }
+
+  void set_speed(gpio_speed speed) {
+    m_init_struct->Speed = std::to_underlying(speed);
+    HAL_GPIO_Init(m_gpio_port, m_init_struct);
+  }
+
+  void set_pin(gpio_pin pin) {
+    m_init_struct->Pin = std::to_underlying(pin);
+    HAL_GPIO_Init(m_gpio_port, m_init_struct);
+  }
+
+  ~gpio_proxy() noexcept {
+    // deinitialize();
   }
 
   void write(bool state) {
-    HAL_GPIO_WritePin(get_gpio_port_ptr(tag_type::port),
-                      tag_type::init_struct.Pin,
+    HAL_GPIO_WritePin(m_gpio_port, m_init_struct->Pin,
                       static_cast<GPIO_PinState>(state));
   }
 
   bool read() const noexcept {
-    return HAL_GPIO_ReadPin(get_gpio_port_ptr(tag_type::port),
-                            tag_type::init_struct.Pin);
+    return HAL_GPIO_ReadPin(m_gpio_port, m_init_struct->Pin);
   }
 
-  void toggle() {
-    HAL_GPIO_TogglePin(get_gpio_port_ptr(tag_type::port),
-                       tag_type::init_struct.Pin);
-  }
+  void toggle() { HAL_GPIO_TogglePin(m_gpio_port, m_init_struct->Pin); }
+
+  GPIO_TypeDef *m_gpio_port;
+  GPIO_InitTypeDef *m_init_struct;
 };
 
 } // namespace gdut

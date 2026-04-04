@@ -439,4 +439,4 @@ static uint8_t uart_rx_buffer[256];
 static uint16_t adc_values[128];
 ```
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_utility.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_utility.hpp)
+相关源码：[BSP/bsp_utility.hpp](../../BSP/bsp_utility.hpp)

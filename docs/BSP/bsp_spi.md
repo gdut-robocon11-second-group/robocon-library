@@ -289,4 +289,4 @@ spi.transmit(data, size, std::chrono::milliseconds::max());
 - 使用 `reinterpret_cast` 将指针转换为 `uint32_t`（符合 HAL DMA API 要求）
 - 对象生命周期必须长于所有 DMA 传输
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_spi.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_spi.hpp)
+相关源码：[BSP/bsp_spi.hpp](../../BSP/bsp_spi.hpp)
