@@ -302,9 +302,7 @@ template <std::size_t Rows, std::size_t Cols>
 class matrix<float, Rows, Cols>
     : public base_matrix<matrix<float, Rows, Cols>> {
 public:
-  using value_type = base_matrix<matrix<float, Rows, Cols>>::value_type;
-  static constexpr std::size_t row_value = Rows;
-  static constexpr std::size_t col_value = Cols;
+  using value_type = float;
 
   constexpr matrix() = default;
   constexpr ~matrix() noexcept = default;

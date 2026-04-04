@@ -59,6 +59,7 @@ public:
     this->IntegralWindupLimit = IntegralWindupLimit;
     return true;
   }
+
   [[nodiscard]] bool set_output_limits(T MinOutput, T MaxOutput) {
     if (MinOutput >= MaxOutput) {
       return false; // Minimum output must be less than maximum output
@@ -75,7 +76,14 @@ public:
     this->Alpha = Alpha;
     return true;
   }
-
+  [[nodiscard]] bool set_integral(T integral)
+  {
+    if (integral < MinOutput || integral > MaxOutput) {
+      return false;
+    }
+    m_integral = integral;
+    return true;
+  }
   [[nodiscard]] bool
   set_parameters(T Kp, T Ki, T Kd, T DeadZone = T{},
                  T IntegralWindupLimit = T{},

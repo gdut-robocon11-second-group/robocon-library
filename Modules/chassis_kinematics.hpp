@@ -10,11 +10,11 @@ namespace gdut {
  * @brief 机械臂运动学类，提供正运动学和逆运动学的计算方法
  * @tparam Radius 轮子到机器人中心的距离，单位为米
  */
-template <std::size_t Radius> class chassis_kinematics {
+template <float Radius> class chassis_kinematics {
 public:
   static_assert(Radius > 0, "Radius must be greater than 0");
 
-  static constexpr std::size_t radius = Radius;
+  static constexpr float radius = Radius;
 
   // 0.707106781f == 1 / sqrt(2)
   static constexpr matrix<float, 4, 3> forward_kinematics_matrix{
