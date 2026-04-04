@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <utility> //因使用到std::move，为提升可移植性，增加
 
 namespace gdut {
 
@@ -30,7 +31,10 @@ struct ServoConfig {
  */
 class servo : private uncopyable {
 public:
-  /// 舵机运动到达目标位置的回调函数类型
+
+  /// 舵机**命令发送**完成时的回调函数类型（参数为当前设置的角度）
+  /// @attention 该回调在寄存器写入后立即触发，不代表舵机已物理转动到位
+
   using move_complete_callback_t = gdut::function<void(uint8_t current_angle)>;
   /// 舵机错误回调函数类型
   using error_callback_t = gdut::function<void(HAL_StatusTypeDef error)>;
@@ -43,7 +47,7 @@ public:
    * 
    * @note 构造函数不会修改硬件，需随后调用 set_angle() 设置初始位置
    */
-  servo(TIM_HandleTypeDef* htim, uint32_t channel, const ServoConfig& config = ServoConfig{1000, 2500, 0, 180, 90})
+  servo(TIM_HandleTypeDef* htim, uint32_t channel, const ServoConfig& config = ServoConfig{1000, 5000, 0, 180, 90})
     : m_htim(htim),
       m_channel(channel),
       m_config(config),
@@ -122,6 +126,14 @@ public:
       }
       return HAL_ERROR;
     }
+
+    if (target_angle < m_config.min_angle) target_angle = m_config.min_angle;
+    if (target_angle > m_config.max_angle) target_angle = m_config.max_angle;
+
+    if (m_current_angle == target_angle) {
+        return HAL_OK;
+    }
+
 
     int8_t direction = (target_angle > m_current_angle) ? 1 : -1;
     uint8_t current = m_current_angle;

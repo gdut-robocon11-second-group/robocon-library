@@ -4,6 +4,7 @@
 #include "stm32f4xx_hal.h"
 #include "bsp_uncopyable.hpp"
 #include <array>
+#include <cstddef>  
 
 namespace gdut {
 
@@ -24,7 +25,7 @@ public:
         gpio_init.Speed = GPIO_SPEED_FREQ_LOW;
 
         // 初始化5路线路传感器引脚
-        for (size_t i = 0; i < line_ports_.size(); ++i) {
+        for (std::size_t i = 0; i < line_ports_.size(); ++i) {
             gpio_init.Pin = line_pins_[i];
             HAL_GPIO_Init(line_ports_[i], &gpio_init);
         }
@@ -43,7 +44,7 @@ public:
     // 读取所有寻迹状态，返回5位掩码（bit0 = 通道0，bit1 = 通道1 ...）
     uint8_t read_all_lines() const {
         uint8_t mask = 0;
-        for (size_t i = 0; i < line_ports_.size(); ++i) {
+        for (std::size_t i = 0; i < line_ports_.size(); ++i) {
             if (HAL_GPIO_ReadPin(line_ports_[i], line_pins_[i]) == GPIO_PIN_SET)
                 mask |= (1 << i);
         }
