@@ -464,4 +464,4 @@ private:
 - 回调中避免调用 `printf` 等耗时函数
 - 使用消息队列将 UART 数据转移到普通任务处理
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_uart.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_uart.hpp)
+相关源码：[BSP/bsp_uart.hpp](../../BSP/bsp_uart.hpp)

@@ -119,4 +119,4 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 - 接收回调运行在中断上下文，避免耗时操作
 - 实例析构时会自动调用 `unregister_self()`，但显式调用会搜索所有总线更安全
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_can.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_can.hpp)
+相关源码：[BSP/bsp_can.hpp](../../BSP/bsp_can.hpp)

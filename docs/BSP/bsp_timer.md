@@ -330,4 +330,4 @@ uint32_t freq = timer.get_frequency();
 uint32_t period = timer.get_period();
 ```
 
-相关源码：[Middlewares/GDUT_RC_Library/BSP/bsp_timer.hpp](../../Middlewares/GDUT_RC_Library/BSP/bsp_timer.hpp)
+相关源码：[BSP/bsp_timer.hpp](../../BSP/bsp_timer.hpp)
