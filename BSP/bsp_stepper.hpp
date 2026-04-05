@@ -6,7 +6,7 @@
 #include "uncopyable.hpp"
 
 #include <cstdint>
-#include <algorithm>
+#include <atomic>
 
 namespace gdut {
 
@@ -141,7 +141,7 @@ private:
   timer& m_step_timer;
   uint32_t m_pwm_channel;
 
-  volatile uint32_t m_remaining_steps{0};   // 剩余步数，Update中断递减
+  std::atomic<uint32_t> m_remaining_steps{0};   // 剩余步数，Update中断递减
 };
 
 } // namespace gdut
