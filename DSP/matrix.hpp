@@ -420,8 +420,10 @@ protected:
     } else {
       auto a = this->get_handle();
       auto c = res.get_handle();
-      arm_status status = arm_mat_scale_f32(&a, static_cast<value_type>(val), &c);
-      assert(status == ARM_MATH_SUCCESS && "Matrix scalar multiplication failed");
+      arm_status status =
+          arm_mat_scale_f32(&a, static_cast<value_type>(val), &c);
+      assert(status == ARM_MATH_SUCCESS &&
+             "Matrix scalar multiplication failed");
     }
     return res;
   }
