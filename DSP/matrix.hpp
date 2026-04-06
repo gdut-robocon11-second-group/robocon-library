@@ -377,16 +377,32 @@ protected:
 
   matrix add_impl(const matrix &other) const {
     matrix res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows * Cols; ++i) {
-      res.m_data[i] = this->m_data[i] + other.m_data[i];
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] + other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_add_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix addition failed");
     }
     return res;
   }
 
   matrix sub_impl(const matrix &other) const {
     matrix res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows * Cols; ++i) {
-      res.m_data[i] = this->m_data[i] - other.m_data[i];
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] - other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_sub_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix subtraction failed");
     }
     return res;
   }
@@ -394,8 +410,15 @@ protected:
   template <typename Ty, typename = std::enable_if_t<is_scalar_v<Ty>>>
   matrix mult_impl(Ty val) const {
     matrix res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows * Cols; ++i) {
-      res.m_data[i] = this->m_data[i] * static_cast<value_type>(val);
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] * static_cast<value_type>(val);
+      }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_scale_f32(&a, static_cast<value_type>(val), &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix scalar multiplication failed");
     }
     return res;
   }
@@ -404,14 +427,22 @@ protected:
   matrix<value_type, Rows, ResCols>
   mult_impl(const matrix<value_type, Cols, ResCols> &other) const {
     matrix<value_type, Rows, ResCols> res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows; ++i) {
-      for (std::size_t j = 0; j < ResCols; ++j) {
-        value_type sum = static_cast<value_type>(0);
-        for (std::size_t k = 0; k < Cols; ++k) {
-          sum += this->get_value(i, k) * other.get_value(k, j);
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < ResCols; ++j) {
+          value_type sum = static_cast<value_type>(0);
+          for (std::size_t k = 0; k < Cols; ++k) {
+            sum += this->get_value(i, k) * other.get_value(k, j);
+          }
+          res.get_value(i, j) = sum;
         }
-        res.get_value(i, j) = sum;
       }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_mult_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix multiplication failed");
     }
     return res;
   }
@@ -432,10 +463,17 @@ protected:
 
   matrix<value_type, Cols, Rows> transpose_impl() const {
     matrix<value_type, Cols, Rows> res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows; ++i) {
-      for (std::size_t j = 0; j < Cols; ++j) {
-        res.get_value(j, i) = this->get_value(i, j);
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < Cols; ++j) {
+          res.get_value(j, i) = this->get_value(i, j);
+        }
       }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_trans_f32(&a, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix transpose failed");
     }
     return res;
   }
@@ -525,8 +563,16 @@ protected:
 
   matrix sub_impl(const matrix &other) const {
     matrix res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows * Cols; ++i) {
-      res.m_data[i] = this->m_data[i] - other.m_data[i];
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] - other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_sub_f64(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix subtraction failed");
     }
     return res;
   }
@@ -544,14 +590,22 @@ protected:
   matrix<value_type, Rows, ResCols>
   mult_impl(const matrix<value_type, Cols, ResCols> &other) const {
     matrix<value_type, Rows, ResCols> res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows; ++i) {
-      for (std::size_t j = 0; j < ResCols; ++j) {
-        value_type sum = static_cast<value_type>(0);
-        for (std::size_t k = 0; k < Cols; ++k) {
-          sum += this->get_value(i, k) * other.get_value(k, j);
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < ResCols; ++j) {
+          value_type sum = static_cast<value_type>(0);
+          for (std::size_t k = 0; k < Cols; ++k) {
+            sum += this->get_value(i, k) * other.get_value(k, j);
+          }
+          res.get_value(i, j) = sum;
         }
-        res.get_value(i, j) = sum;
       }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_mult_f64(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix multiplication failed");
     }
     return res;
   }
@@ -572,10 +626,17 @@ protected:
 
   matrix<value_type, Cols, Rows> transpose_impl() const {
     matrix<value_type, Cols, Rows> res{build_but_not_clean_mat};
-    for (std::size_t i = 0; i < Rows; ++i) {
-      for (std::size_t j = 0; j < Cols; ++j) {
-        res.get_value(j, i) = this->get_value(i, j);
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < Cols; ++j) {
+          res.get_value(j, i) = this->get_value(i, j);
+        }
       }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_trans_f64(&a, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix transpose failed");
     }
     return res;
   }
