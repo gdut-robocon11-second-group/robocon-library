@@ -259,13 +259,13 @@ public:
   }
 
   static Derived zeros() {
-    Derived res;
+    Derived res{build_but_not_clean_mat};
     std::fill_n(res.get(), Rows * Cols, static_cast<T>(0));
     return res;
   }
 
   static Derived ones() {
-    Derived res;
+    Derived res{build_but_not_clean_mat};
     std::fill_n(res.get(), Rows * Cols, static_cast<T>(1));
     return res;
   }
@@ -347,6 +347,9 @@ public:
         break;
       }
       m_data[iter++] = d;
+    }
+    for (std::size_t i = iter; i < Rows * Cols; ++i) {
+      m_data[i] = static_cast<value_type>(0);
     }
   }
 
@@ -525,6 +528,9 @@ public:
         break;
       }
       m_data[iter++] = d;
+    }
+    for (std::size_t i = iter; i < Rows * Cols; ++i) {
+      m_data[i] = static_cast<value_type>(0);
     }
   }
 
