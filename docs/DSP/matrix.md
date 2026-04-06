@@ -7,7 +7,7 @@
 - 以 `matrix<T, Rows, Cols>` 作为核心类型
 - 以 `vector<T, Rows>` 作为列向量别名
 - 对 `float` 和 `double` 两个特化版本提供完整实现
-- 逆矩阵计算对接 CMSIS-DSP，常规加减乘/转置使用模板循环实现
+- 逆矩阵计算对接 CMSIS-DSP；常规加减乘/转置默认使用模板循环实现，其中 `matrix<float, ...>` 在较大矩阵时会按尺寸阈值切换到 CMSIS-DSP 分支
 - 通过 CRTP 基类 `base_matrix<Matrix<T, Rows, Cols>>` 提供通用接口
 
 矩阵数据存放在栈上定长数组中，采用行优先（row-major）布局，尺寸和类型约束都在编译期完成。
