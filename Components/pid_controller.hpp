@@ -120,7 +120,7 @@ private:
   T Kd{};
   T DeadZone{};
   T IntegralWindupLimit{};
-  T MinOutput = std::numeric_limits<T>::lowest();
+  T MinOutput = -std::numeric_limits<T>::max();
   T MaxOutput = std::numeric_limits<T>::max();
   T Alpha{}; // 滤波系数
 
