@@ -9,7 +9,7 @@ namespace gdut {
 // 卡尔曼滤波器类模板
 // N: 状态维度, L: 控制输入维度, M: 观测维度, T: 数据类型
 // 注意：此类模板需要的栈空间较大，使用时请确保有足够的内存
-// 特别是在rtos的任务中使用时，建议增加任务的栈大小 sizeof(kalman_filter)
+// 特别是在RTOS的任务中使用时，建议增加任务的栈大小 sizeof(kalman_filter)
 template <std::size_t N, std::size_t L, std::size_t M, typename T = float>
 class kalman_filter : uncopyable {
 public:
