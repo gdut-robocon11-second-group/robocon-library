@@ -47,9 +47,8 @@ public:
     static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
                   "The function object requires stricter alignment than "
                   "storage provides.");
-    std::construct_at(
-        std::launder(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage)),
-        std::forward<Func>(func));
+    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
+                      std::forward<Func>(func));
     m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
   }
 
@@ -105,10 +104,18 @@ public:
   template <typename Func, typename = std::enable_if_t<!std::is_same_v<
                                std::decay_t<Func>, basic_function>>>
   basic_function &operator=(Func &&func) {
+    static_assert(
+        sizeof(model<std::decay_t<Func>>) <= StorageSize,
+        "The function object is too large and exceeds the storage space.");
+    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
+                  "The function object must be callable and match the "
+                  "specified function signature.");
+    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
+                  "The function object requires stricter alignment than "
+                  "storage provides.");
     destroy();
-    std::construct_at(
-        std::launder(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage)),
-        std::forward<Func>(func));
+    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
+                      std::forward<Func>(func));
     m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
     return *this;
   }
@@ -145,11 +152,10 @@ protected:
     }
 
     void clone(std::byte *storage) override {
-      std::construct_at(std::launder(reinterpret_cast<model<Func> *>(storage)),
-                        *this);
+      std::construct_at(reinterpret_cast<model<Func> *>(storage), *this);
     }
     void move(std::byte *storage) noexcept override {
-      std::construct_at(std::launder(reinterpret_cast<model<Func> *>(storage)),
+      std::construct_at(reinterpret_cast<model<Func> *>(storage),
                         std::move(*this));
     }
 
