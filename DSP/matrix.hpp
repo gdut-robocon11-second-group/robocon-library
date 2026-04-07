@@ -13,6 +13,13 @@
 
 namespace gdut {
 
+struct build_and_clean_mat_t {};
+
+struct build_but_not_clean_mat_t {};
+
+inline constexpr build_and_clean_mat_t build_and_clean_mat{};
+inline constexpr build_but_not_clean_mat_t build_but_not_clean_mat{};
+
 template <typename Mat, std::size_t Rows, std::size_t Cols>
 struct redefine_matrix {};
 
@@ -93,7 +100,8 @@ public:
 
   T det() const {
     static_assert(Rows == Cols, "Determinant only defined for square matrices");
-    // 对小矩阵使用 if constexpr 在编译期选择更快的展开公式，较大的矩阵使用LU分解计算行列式
+    // 对小矩阵使用 if constexpr
+    // 在编译期选择更快的展开公式，较大的矩阵使用LU分解计算行列式
     // 行列式计算原理：https://zh.wikipedia.org/wiki/%E8%A1%8C%E5%88%97%E5%BC%8F
     if constexpr (Rows == 1) {
       return get_value(0, 0);
@@ -250,12 +258,16 @@ public:
     return res;
   }
 
-  friend Derived operator+(const Derived &a, const Derived &b) {
-    return a.add(b);
+  static Derived zeros() {
+    Derived res{build_but_not_clean_mat};
+    std::fill_n(res.get(), Rows * Cols, static_cast<T>(0));
+    return res;
   }
 
-  friend Derived operator-(const Derived &a, const Derived &b) {
-    return a.sub(b);
+  static Derived ones() {
+    Derived res{build_but_not_clean_mat};
+    std::fill_n(res.get(), Rows * Cols, static_cast<T>(1));
+    return res;
   }
 
 protected:
@@ -265,6 +277,16 @@ protected:
     return static_cast<const Derived *>(this);
   }
 };
+
+template <typename Mat, typename = std::enable_if_t<is_matrix_v<Mat>>>
+inline Mat operator+(const Mat &a, const Mat &b) {
+  return a.add(b);
+}
+
+template <typename Mat, typename = std::enable_if_t<is_matrix_v<Mat>>>
+inline Mat operator-(const Mat &a, const Mat &b) {
+  return a.sub(b);
+}
 
 template <typename MatA, typename MatB,
           typename = std::enable_if_t<is_matrix_v<MatA> && is_matrix_v<MatB>>>
@@ -301,19 +323,20 @@ template <typename T, std::size_t Rows, std::size_t Cols> class matrix {};
 template <std::size_t Rows, std::size_t Cols>
 class matrix<float, Rows, Cols>
     : public base_matrix<matrix<float, Rows, Cols>> {
-public:
   using value_type = float;
 
-  constexpr matrix() = default;
+public:
+  explicit constexpr matrix(build_and_clean_mat_t) {
+    std::fill_n(m_data, Rows * Cols, static_cast<value_type>(0));
+  }
+
+  explicit constexpr matrix(build_but_not_clean_mat_t) {
+    // 不初始化数据，使用未定义的值构造矩阵实例
+  }
+
+  constexpr matrix() : matrix(build_and_clean_mat) {}
+
   constexpr ~matrix() noexcept = default;
-
-  constexpr matrix(const matrix &other) {
-    std::copy_n(other.m_data, Rows * Cols, m_data);
-  }
-
-  constexpr matrix(matrix &&other) noexcept {
-    std::copy_n(other.m_data, Rows * Cols, m_data);
-  }
 
   explicit constexpr matrix(std::initializer_list<value_type> list) {
     assert(list.size() <= Rows * Cols &&
@@ -325,52 +348,113 @@ public:
       }
       m_data[iter++] = d;
     }
+    for (std::size_t i = iter; i < Rows * Cols; ++i) {
+      m_data[i] = static_cast<value_type>(0);
+    }
+  }
+
+  constexpr matrix(const matrix &other) {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
+  constexpr matrix(matrix &&other) noexcept {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
+  matrix &operator=(const matrix &other) {
+    if (this != std::addressof(other)) {
+      std::copy_n(other.m_data, Rows * Cols, m_data);
+    }
+    return *this;
+  }
+
+  matrix &operator=(matrix &&other) noexcept {
+    if (this != std::addressof(other)) {
+      std::copy_n(other.m_data, Rows * Cols, m_data);
+    }
+    return *this;
   }
 
 protected:
   friend base_matrix<matrix<value_type, Rows, Cols>>;
 
   matrix add_impl(const matrix &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_add_f32(&a, &b, &c);
+    matrix res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] + other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_add_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix addition failed");
+    }
     return res;
   }
 
   matrix sub_impl(const matrix &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_sub_f32(&a, &b, &c);
+    matrix res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] - other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_sub_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix subtraction failed");
+    }
     return res;
   }
 
   template <typename Ty, typename = std::enable_if_t<is_scalar_v<Ty>>>
   matrix mult_impl(Ty val) const {
-    auto a = this->get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_scale_f32(&a, static_cast<value_type>(val), &c);
+    matrix res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] * static_cast<value_type>(val);
+      }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status =
+          arm_mat_scale_f32(&a, static_cast<value_type>(val), &c);
+      assert(status == ARM_MATH_SUCCESS &&
+             "Matrix scalar multiplication failed");
+    }
     return res;
   }
 
   template <std::size_t ResCols>
   matrix<value_type, Rows, ResCols>
   mult_impl(const matrix<value_type, Cols, ResCols> &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix<value_type, Rows, ResCols> res;
-    auto c = res.get_handle();
-    arm_mat_mult_f32(&a, &b, &c);
+    matrix<value_type, Rows, ResCols> res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < ResCols; ++j) {
+          value_type sum = static_cast<value_type>(0);
+          for (std::size_t k = 0; k < Cols; ++k) {
+            sum += this->get_value(i, k) * other.get_value(k, j);
+          }
+          res.get_value(i, j) = sum;
+        }
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_mult_f32(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix multiplication failed");
+    }
     return res;
   }
 
   matrix inverse_impl() const {
     matrix tmp{*this};
-    matrix res;
+    matrix res{build_but_not_clean_mat};
     auto a = tmp.get_handle();
     auto c = res.get_handle();
     arm_status status = arm_mat_inverse_f32(&a, &c);
@@ -383,10 +467,19 @@ protected:
   }
 
   matrix<value_type, Cols, Rows> transpose_impl() const {
-    auto a = this->get_handle();
-    matrix<value_type, Cols, Rows> res;
-    auto c = res.get_handle();
-    arm_mat_trans_f32(&a, &c);
+    matrix<value_type, Cols, Rows> res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < Cols; ++j) {
+          res.get_value(j, i) = this->get_value(i, j);
+        }
+      }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_trans_f32(&a, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix transpose failed");
+    }
     return res;
   }
 
@@ -407,24 +500,26 @@ protected:
   }
 
 private:
-  value_type m_data[Rows * Cols] = {};
+  value_type m_data[Rows * Cols];
 };
 
 template <std::size_t Rows, std::size_t Cols>
 class matrix<double, Rows, Cols>
     : public base_matrix<matrix<double, Rows, Cols>> {
-public:
   using value_type = double;
-  constexpr matrix() = default;
+
+public:
+  explicit constexpr matrix(build_and_clean_mat_t) {
+    std::fill_n(m_data, Rows * Cols, static_cast<value_type>(0));
+  }
+
+  explicit constexpr matrix(build_but_not_clean_mat_t) {
+    // 不初始化数据，使用未定义的值构造矩阵实例
+  }
+
+  constexpr matrix() : matrix(build_and_clean_mat) {}
+
   constexpr ~matrix() noexcept = default;
-
-  constexpr matrix(const matrix &other) {
-    std::copy_n(other.m_data, Rows * Cols, m_data);
-  }
-
-  constexpr matrix(matrix &&other) noexcept {
-    std::copy_n(other.m_data, Rows * Cols, m_data);
-  }
 
   explicit constexpr matrix(std::initializer_list<value_type> list) {
     assert(list.size() <= Rows * Cols &&
@@ -436,52 +531,96 @@ public:
       }
       m_data[iter++] = d;
     }
+    for (std::size_t i = iter; i < Rows * Cols; ++i) {
+      m_data[i] = static_cast<value_type>(0);
+    }
+  }
+
+  constexpr matrix(const matrix &other) {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
+  constexpr matrix(matrix &&other) noexcept {
+    std::copy_n(other.m_data, Rows * Cols, m_data);
+  }
+
+  matrix &operator=(const matrix &other) {
+    if (this != std::addressof(other)) {
+      std::copy_n(other.m_data, Rows * Cols, m_data);
+    }
+    return *this;
+  }
+
+  matrix &operator=(matrix &&other) noexcept {
+    if (this != std::addressof(other)) {
+      std::copy_n(other.m_data, Rows * Cols, m_data);
+    }
+    return *this;
   }
 
 protected:
   friend base_matrix<matrix<value_type, Rows, Cols>>;
 
   matrix add_impl(const matrix &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_add_f64(&a, &b, &c);
+    matrix res{build_but_not_clean_mat};
+    for (std::size_t i = 0; i < Rows * Cols; ++i) {
+      res.m_data[i] = this->m_data[i] + other.m_data[i];
+    }
     return res;
   }
 
   matrix sub_impl(const matrix &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_sub_f64(&a, &b, &c);
+    matrix res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows * Cols; ++i) {
+        res.m_data[i] = this->m_data[i] - other.m_data[i];
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_sub_f64(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix subtraction failed");
+    }
     return res;
   }
 
   template <typename Ty, typename = std::enable_if_t<is_scalar_v<Ty>>>
   matrix mult_impl(Ty val) const {
-    auto a = this->get_handle();
-    matrix res;
-    auto c = res.get_handle();
-    arm_mat_scale_f64(&a, static_cast<value_type>(val), &c);
+    matrix res{build_but_not_clean_mat};
+    for (std::size_t i = 0; i < Rows * Cols; ++i) {
+      res.m_data[i] = this->m_data[i] * static_cast<value_type>(val);
+    }
     return res;
   }
 
   template <std::size_t ResCols>
   matrix<value_type, Rows, ResCols>
   mult_impl(const matrix<value_type, Cols, ResCols> &other) const {
-    auto a = this->get_handle();
-    auto b = other.get_handle();
-    matrix<value_type, Rows, ResCols> res;
-    auto c = res.get_handle();
-    arm_mat_mult_f64(&a, &b, &c);
+    matrix<value_type, Rows, ResCols> res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < ResCols; ++j) {
+          value_type sum = static_cast<value_type>(0);
+          for (std::size_t k = 0; k < Cols; ++k) {
+            sum += this->get_value(i, k) * other.get_value(k, j);
+          }
+          res.get_value(i, j) = sum;
+        }
+      }
+    } else {
+      auto a = this->get_handle();
+      auto b = other.get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_mult_f64(&a, &b, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix multiplication failed");
+    }
     return res;
   }
 
   matrix inverse_impl() const {
     matrix tmp{*this};
-    matrix res;
+    matrix res{build_but_not_clean_mat};
     auto a = tmp.get_handle();
     auto c = res.get_handle();
     arm_status status = arm_mat_inverse_f64(&a, &c);
@@ -494,10 +633,19 @@ protected:
   }
 
   matrix<value_type, Cols, Rows> transpose_impl() const {
-    auto a = this->get_handle();
-    matrix<value_type, Cols, Rows> res;
-    auto c = res.get_handle();
-    arm_mat_trans_f64(&a, &c);
+    matrix<value_type, Cols, Rows> res{build_but_not_clean_mat};
+    if constexpr (Rows * Cols <= 25) {
+      for (std::size_t i = 0; i < Rows; ++i) {
+        for (std::size_t j = 0; j < Cols; ++j) {
+          res.get_value(j, i) = this->get_value(i, j);
+        }
+      }
+    } else {
+      auto a = this->get_handle();
+      auto c = res.get_handle();
+      arm_status status = arm_mat_trans_f64(&a, &c);
+      assert(status == ARM_MATH_SUCCESS && "Matrix transpose failed");
+    }
     return res;
   }
 
@@ -518,7 +666,7 @@ protected:
   }
 
 private:
-  value_type m_data[Rows * Cols] = {};
+  value_type m_data[Rows * Cols];
 };
 
 template <typename T, std::size_t Rows> using vector = matrix<T, Rows, 1>;
@@ -532,7 +680,7 @@ inline constexpr T dot(const vector<T, Rows> &a, const vector<T, Rows> &b) {
   return result;
 }
 
-template <typename T, std::size_t Rows>
+template <typename T, std::size_t Rows, typename = std::enable_if_t<Rows != 1>>
 inline constexpr T operator*(const vector<T, Rows> &a,
                              const vector<T, Rows> &b) {
   return dot(a, b);
