@@ -138,7 +138,7 @@ protected:
     virtual R operator()(Args... args) = 0;
     virtual void clone(std::byte *storage) = 0;
     virtual void move(std::byte *storage) noexcept = 0;
-    virtual ~callable() = default;
+    virtual void destroy(std::byte *storage) noexcept = 0;
   };
 
   template <typename Func> struct model : callable {
@@ -148,7 +148,7 @@ protected:
     model(Func &&fn) : func(std::move(fn)) {}
 
     R operator()(Args... args) override {
-      return func(std::forward<Args>(args)...);
+      return std::invoke(func, std::forward<Args>(args)...);
     }
 
     void clone(std::byte *storage) override {
@@ -158,13 +158,16 @@ protected:
       std::construct_at(reinterpret_cast<model<Func> *>(storage),
                         std::move(*this));
     }
+    void destroy(std::byte *storage) noexcept override {
+      std::destroy_at(reinterpret_cast<model<Func> *>(storage));
+    }
 
-    ~model() override = default;
+    ~model() = default;
   };
 
   void destroy() noexcept {
     if (m_callable) {
-      std::destroy_at(m_callable);
+      m_callable->destroy(m_storage);
       m_callable = nullptr;
     }
   }
