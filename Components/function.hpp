@@ -140,8 +140,7 @@ protected:
     ~model() noexcept override = default;
   };
 
-  template <typename Func>
-  void emplace(Func&& func) {
+  template <typename Func> void emplace(Func &&func) {
     static_assert(
         sizeof(model<std::decay_t<Func>>) <= StorageSize,
         "The function object is too large and exceeds the storage space.");
@@ -162,7 +161,7 @@ protected:
 
   void destroy() noexcept {
     if (m_callable) {
-      std::destroy_at(std::launder(reinterpret_cast<callable *>(m_storage)));
+      std::destroy_at(m_callable);
       m_callable = nullptr;
     }
   }
