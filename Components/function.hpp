@@ -47,6 +47,10 @@ public:
     static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
                   "The function object requires stricter alignment than "
                   "storage provides.");
+    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow move constructible.");
+    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow destructible.");
     std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
                       std::forward<Func>(func));
     m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
@@ -113,6 +117,10 @@ public:
     static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
                   "The function object requires stricter alignment than "
                   "storage provides.");
+    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow move constructible.");
+    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow destructible.");
     destroy();
     std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
                       std::forward<Func>(func));
@@ -138,7 +146,7 @@ protected:
     virtual R operator()(Args... args) = 0;
     virtual void clone(std::byte *storage) = 0;
     virtual void move(std::byte *storage) noexcept = 0;
-    virtual void destroy(std::byte *storage) noexcept = 0;
+    virtual ~callable() noexcept = default;
   };
 
   template <typename Func> struct model : callable {
@@ -158,16 +166,13 @@ protected:
       std::construct_at(reinterpret_cast<model<Func> *>(storage),
                         std::move(*this));
     }
-    void destroy(std::byte *storage) noexcept override {
-      std::destroy_at(reinterpret_cast<model<Func> *>(storage));
-    }
 
-    ~model() = default;
+    ~model() noexcept override = default;
   };
 
   void destroy() noexcept {
     if (m_callable) {
-      m_callable->destroy(m_storage);
+      std::destroy_at(std::launder(reinterpret_cast<callable *>(m_storage)));
       m_callable = nullptr;
     }
   }
