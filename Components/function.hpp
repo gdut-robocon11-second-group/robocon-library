@@ -38,22 +38,7 @@ public:
   template <typename Func, typename = std::enable_if_t<!std::is_same_v<
                                std::decay_t<Func>, basic_function>>>
   basic_function(Func &&func) {
-    static_assert(
-        sizeof(model<std::decay_t<Func>>) <= StorageSize,
-        "The function object is too large and exceeds the storage space.");
-    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
-                  "The function object must be callable and match the "
-                  "specified function signature.");
-    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
-                  "The function object requires stricter alignment than "
-                  "storage provides.");
-    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
-                  "The function object must be nothrow move constructible.");
-    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
-                  "The function object must be nothrow destructible.");
-    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
-                      std::forward<Func>(func));
-    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+    emplace(std::forward<Func>(func));
   }
 
   basic_function(basic_function &&other) noexcept {
@@ -108,23 +93,8 @@ public:
   template <typename Func, typename = std::enable_if_t<!std::is_same_v<
                                std::decay_t<Func>, basic_function>>>
   basic_function &operator=(Func &&func) {
-    static_assert(
-        sizeof(model<std::decay_t<Func>>) <= StorageSize,
-        "The function object is too large and exceeds the storage space.");
-    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
-                  "The function object must be callable and match the "
-                  "specified function signature.");
-    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
-                  "The function object requires stricter alignment than "
-                  "storage provides.");
-    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
-                  "The function object must be nothrow move constructible.");
-    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
-                  "The function object must be nothrow destructible.");
     destroy();
-    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
-                      std::forward<Func>(func));
-    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+    emplace(std::forward<Func>(func));
     return *this;
   }
 
@@ -169,6 +139,26 @@ protected:
 
     ~model() noexcept override = default;
   };
+
+  template <typename Func>
+  void emplace(Func&& func) {
+    static_assert(
+        sizeof(model<std::decay_t<Func>>) <= StorageSize,
+        "The function object is too large and exceeds the storage space.");
+    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
+                  "The function object must be callable and match the "
+                  "specified function signature.");
+    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
+                  "The function object requires stricter alignment than "
+                  "storage provides.");
+    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow move constructible.");
+    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow destructible.");
+    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
+                      std::forward<Func>(func));
+    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+  }
 
   void destroy() noexcept {
     if (m_callable) {
