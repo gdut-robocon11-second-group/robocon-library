@@ -53,7 +53,6 @@ public:
     if (other.m_callable) {
       other.m_callable->move(m_storage);
       m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
-      other.destroy();
     }
   }
 
@@ -87,7 +86,6 @@ public:
       if (other.m_callable) {
         other.m_callable->move(m_storage);
         m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
-        other.destroy();
       }
     }
     return *this;
