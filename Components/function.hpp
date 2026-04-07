@@ -4,6 +4,8 @@
 #include "utils_type_traits.hpp"
 #include <cstddef>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -45,7 +47,9 @@ public:
     static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
                   "The function object requires stricter alignment than "
                   "storage provides.");
-    new (m_storage) model<std::decay_t<Func>>{std::forward<Func>(func)};
+    std::construct_at(
+        std::launder(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage)),
+        std::forward<Func>(func));
     m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
   }
 
@@ -53,6 +57,7 @@ public:
     if (other.m_callable) {
       other.m_callable->move(m_storage);
       m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+      other.destroy();
     }
   }
 
@@ -64,7 +69,7 @@ public:
     if (!valid()) {
       std::terminate();
     }
-    return (*m_callable)(std::forward<Args>(args)...);
+    return std::invoke(*m_callable, std::forward<Args>(args)...);
   }
 
   explicit operator bool() const noexcept { return valid(); }
@@ -86,8 +91,25 @@ public:
       if (other.m_callable) {
         other.m_callable->move(m_storage);
         m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+        other.destroy();
       }
     }
+    return *this;
+  }
+
+  basic_function &operator=(std::nullptr_t) noexcept {
+    destroy();
+    return *this;
+  }
+
+  template <typename Func, typename = std::enable_if_t<!std::is_same_v<
+                               std::decay_t<Func>, basic_function>>>
+  basic_function &operator=(Func &&func) {
+    destroy();
+    std::construct_at(
+        std::launder(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage)),
+        std::forward<Func>(func));
+    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
     return *this;
   }
 
@@ -121,25 +143,29 @@ protected:
     R operator()(Args... args) override {
       return func(std::forward<Args>(args)...);
     }
+
     void clone(std::byte *storage) override {
-      new (storage) model<Func>(*this);
+      std::construct_at(std::launder(reinterpret_cast<model<Func> *>(storage)),
+                        *this);
     }
     void move(std::byte *storage) noexcept override {
-      new (storage) model<Func>(std::move(*this));
+      std::construct_at(std::launder(reinterpret_cast<model<Func> *>(storage)),
+                        std::move(*this));
     }
+
     ~model() override = default;
   };
 
   void destroy() noexcept {
     if (m_callable) {
-      m_callable->~callable();
+      std::destroy_at(m_callable);
       m_callable = nullptr;
     }
   }
 
 private:
   callable *m_callable{nullptr};
-  alignas(Alignment) std::byte m_storage[StorageSize]{};
+  alignas(Alignment) std::byte m_storage[StorageSize];
 };
 
 template <typename Func, std::size_t StorageSize = 32,
