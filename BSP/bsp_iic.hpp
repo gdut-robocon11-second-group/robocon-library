@@ -3,7 +3,7 @@
 
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_i2c.h"
-#include "bsp_type_traits.hpp"
+#include "bsp_utility.hpp"
 #include "function.hpp"
 #include "uncopyable.hpp"
 
@@ -153,7 +153,7 @@ public:
 
   // 获取错误码
   uint32_t get_error() const {
-    return m_hi2c ? m_hi2c->ErrorCode : HAL_I2C_ERROR_INVALID_CALLBACK;
+    return m_hi2c ? m_hi2c->ErrorCode : HAL_I2C_STATE_ERROR;
   }
 
    // 获取I2C实例索引
