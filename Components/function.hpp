@@ -4,6 +4,8 @@
 #include "utils_type_traits.hpp"
 #include <cstddef>
 #include <exception>
+#include <functional>
+#include <memory>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -36,17 +38,7 @@ public:
   template <typename Func, typename = std::enable_if_t<!std::is_same_v<
                                std::decay_t<Func>, basic_function>>>
   basic_function(Func &&func) {
-    static_assert(
-        sizeof(model<std::decay_t<Func>>) <= StorageSize,
-        "The function object is too large and exceeds the storage space.");
-    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
-                  "The function object must be callable and match the "
-                  "specified function signature.");
-    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
-                  "The function object requires stricter alignment than "
-                  "storage provides.");
-    new (m_storage) model<std::decay_t<Func>>{std::forward<Func>(func)};
-    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+    emplace(std::forward<Func>(func));
   }
 
   basic_function(basic_function &&other) noexcept {
@@ -65,7 +57,7 @@ public:
     if (!valid()) {
       std::terminate();
     }
-    return (*m_callable)(std::forward<Args>(args)...);
+    return std::invoke(*m_callable, std::forward<Args>(args)...);
   }
 
   explicit operator bool() const noexcept { return valid(); }
@@ -93,6 +85,19 @@ public:
     return *this;
   }
 
+  basic_function &operator=(std::nullptr_t) noexcept {
+    destroy();
+    return *this;
+  }
+
+  template <typename Func, typename = std::enable_if_t<!std::is_same_v<
+                               std::decay_t<Func>, basic_function>>>
+  basic_function &operator=(Func &&func) {
+    destroy();
+    emplace(std::forward<Func>(func));
+    return *this;
+  }
+
   void swap(basic_function &other) noexcept {
     if (this == std::addressof(other)) {
       return;
@@ -111,7 +116,7 @@ protected:
     virtual R operator()(Args... args) = 0;
     virtual void clone(std::byte *storage) = 0;
     virtual void move(std::byte *storage) noexcept = 0;
-    virtual ~callable() = default;
+    virtual ~callable() noexcept = default;
   };
 
   template <typename Func> struct model : callable {
@@ -121,27 +126,49 @@ protected:
     model(Func &&fn) : func(std::move(fn)) {}
 
     R operator()(Args... args) override {
-      return func(std::forward<Args>(args)...);
+      return std::invoke(func, std::forward<Args>(args)...);
     }
+
     void clone(std::byte *storage) override {
-      new (storage) model<Func>(*this);
+      std::construct_at(reinterpret_cast<model<Func> *>(storage), *this);
     }
     void move(std::byte *storage) noexcept override {
-      new (storage) model<Func>(std::move(*this));
+      std::construct_at(reinterpret_cast<model<Func> *>(storage),
+                        std::move(*this));
     }
-    ~model() override = default;
+
+    ~model() noexcept override = default;
   };
+
+  template <typename Func> void emplace(Func &&func) {
+    static_assert(
+        sizeof(model<std::decay_t<Func>>) <= StorageSize,
+        "The function object is too large and exceeds the storage space.");
+    static_assert(std::is_invocable_r_v<R, std::decay_t<Func>, Args...>,
+                  "The function object must be callable and match the "
+                  "specified function signature.");
+    static_assert(alignof(model<std::decay_t<Func>>) <= Alignment,
+                  "The function object requires stricter alignment than "
+                  "storage provides.");
+    static_assert(std::is_nothrow_move_constructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow move constructible.");
+    static_assert(std::is_nothrow_destructible_v<std::decay_t<Func>>,
+                  "The function object must be nothrow destructible.");
+    std::construct_at(reinterpret_cast<model<std::decay_t<Func>> *>(m_storage),
+                      std::forward<Func>(func));
+    m_callable = std::launder(reinterpret_cast<callable *>(m_storage));
+  }
 
   void destroy() noexcept {
     if (m_callable) {
-      m_callable->~callable();
+      std::destroy_at(m_callable);
       m_callable = nullptr;
     }
   }
 
 private:
   callable *m_callable{nullptr};
-  alignas(Alignment) std::byte m_storage[StorageSize]{};
+  alignas(Alignment) std::byte m_storage[StorageSize];
 };
 
 template <typename Func, std::size_t StorageSize = 32,
