@@ -593,7 +593,15 @@ public:
    Yaw通过陀螺仪Z轴积分得到，长期会有漂移，需要外部传感器（如磁力计）校正
    *       或者定期调用 reset_yaw() 重新标定
    */
-  float get_yaw() const { return m_prev_yaw; }
+  float get_yaw() const { 
+    float yaw = m_prev_yaw;
+    // 将yaw限制在[-π, π]范围内
+    while (yaw > 3.14159265f)
+      yaw -= 2.0f * 3.14159265f;
+    while (yaw < -3.14159265f)
+      yaw += 2.0f * 3.14159265f;
+    return yaw;
+   }
 
   /**
    * @brief 计算真实加速度（去掉重力加速度）
