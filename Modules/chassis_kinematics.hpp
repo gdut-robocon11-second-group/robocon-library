@@ -7,7 +7,7 @@
 namespace gdut {
 
 /*
- * @brief 机械臂运动学类，提供正运动学和逆运动学的计算方法
+ * @brief 底盘运动学类，提供机器人速度与轮速之间的正逆运动学计算方法
  * @tparam Radius 轮子到机器人中心的距离，单位为米
  */
 template <float Radius> class chassis_kinematics {

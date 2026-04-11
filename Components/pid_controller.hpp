@@ -78,7 +78,12 @@ public:
   }
   [[nodiscard]] bool set_integral(T integral)
   {
-    m_integral = std::clamp(integral, MinOutput, MaxOutput);
+    if (IntegralWindupLimit > T{}) {
+      m_integral = std::clamp(integral, -IntegralWindupLimit,
+                              IntegralWindupLimit);
+    } else {
+      m_integral = integral;
+    }
     return true;
   }
   [[nodiscard]] bool
