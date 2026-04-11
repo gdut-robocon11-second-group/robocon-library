@@ -5,8 +5,8 @@
 #include "bsp_timer.hpp"
 #include "uncopyable.hpp"
 
-#include <cstdint>
 #include <atomic>
+#include <cstdint>
 
 namespace gdut {
 
@@ -30,15 +30,10 @@ public:
    * @param step_timer    已配置为PWM模式的 timer 对象
    * @param pwm_channel   PWM通道（TIM_CHANNEL_1 ~ TIM_CHANNEL_4）
    */
-  pwm_stepper_motor(gpio_proxy& dir_pin,
-                    gpio_proxy& enable_pin,
-                    timer& step_timer,
-                    uint32_t pwm_channel = TIM_CHANNEL_1)
-      : m_dir_pin(dir_pin),
-        m_enable_pin(enable_pin),
-        m_step_timer(step_timer),
-        m_pwm_channel(pwm_channel),
-        m_remaining_steps(0) {
+  pwm_stepper_motor(gpio_proxy &dir_pin, gpio_proxy &enable_pin,
+                    timer &step_timer, uint32_t pwm_channel = TIM_CHANNEL_1)
+      : m_dir_pin(dir_pin), m_enable_pin(enable_pin), m_step_timer(step_timer),
+        m_pwm_channel(pwm_channel), m_remaining_steps(0) {
 
     m_step_timer.register_period_elapsed_callback(
         [this]() { handle_step_isr(); });
@@ -46,19 +41,16 @@ public:
 
   ~pwm_stepper_motor() {
     stop();
+    m_step_timer.register_period_elapsed_callback(timer::callback_t{});
   }
 
-  void set_direction(bool clockwise) {
-    m_dir_pin.write(clockwise ? 1 : 0);
-  }
+  void set_direction(bool clockwise) { m_dir_pin.write(clockwise ? 1 : 0); }
 
   void enable(bool en = true) {
-    m_enable_pin.write(en ? 0 : 1);   // 低电平使能
+    m_enable_pin.write(en ? 0 : 1); // 低电平使能
   }
 
-  void disable() {
-    enable(false);
-  }
+  void disable() { enable(false); }
 
   /**
    * @brief 设置速度（单位：steps/s）
@@ -71,14 +63,17 @@ public:
     }
 
     // 限制最大速度，防止 ARR 过小导致不稳定
-    if (steps_per_sec > 50000) steps_per_sec = 50000;
+    if (steps_per_sec > 50000)
+      steps_per_sec = 50000;
 
-    auto* htim = m_step_timer.get_htim();
-    if (!htim) return;
+    auto *htim = m_step_timer.get_htim();
+    if (!htim)
+      return;
 
     // 定时器计数频率为 1MHz → 周期单位为 us
     uint32_t period_us = 1000000UL / steps_per_sec;
-    if (period_us == 0) period_us = 1;
+    if (period_us == 0)
+      period_us = 1;
 
     __HAL_TIM_SET_AUTORELOAD(htim, period_us - 1);
 
@@ -100,7 +95,8 @@ public:
    * @brief 非阻塞移动指定步数，完成后自动停止
    */
   void move_steps(uint32_t num_steps, uint32_t steps_per_sec) {
-    if (num_steps == 0) return;
+    if (num_steps == 0)
+      return;
 
     m_remaining_steps = num_steps;
     set_speed(steps_per_sec);
@@ -108,7 +104,7 @@ public:
 
   /** 立即停止运动 */
   void stop() {
-    auto* htim = m_step_timer.get_htim();
+    auto *htim = m_step_timer.get_htim();
     if (htim) {
       timer::timer_pwm pwm_helper(&m_step_timer);
       pwm_helper.pwm_stop(m_pwm_channel);
@@ -117,13 +113,9 @@ public:
     m_remaining_steps = 0;
   }
 
-  bool is_moving() const noexcept {
-    return m_remaining_steps > 0;
-  }
+  bool is_moving() const noexcept { return m_remaining_steps > 0; }
 
-  uint32_t get_remaining_steps() const noexcept {
-    return m_remaining_steps;
-  }
+  uint32_t get_remaining_steps() const noexcept { return m_remaining_steps; }
 
 private:
   void handle_step_isr() {
@@ -136,12 +128,12 @@ private:
   }
 
 private:
-  gpio_proxy& m_dir_pin;
-  gpio_proxy& m_enable_pin;
-  timer& m_step_timer;
+  gpio_proxy &m_dir_pin;
+  gpio_proxy &m_enable_pin;
+  timer &m_step_timer;
   uint32_t m_pwm_channel;
 
-  std::atomic<uint32_t> m_remaining_steps{0};   // 剩余步数，Update中断递减
+  std::atomic<uint32_t> m_remaining_steps{0}; // 剩余步数，Update中断递减
 };
 
 } // namespace gdut

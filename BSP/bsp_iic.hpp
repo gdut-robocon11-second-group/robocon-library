@@ -177,7 +177,7 @@ public:
 
   // 获取错误码
   uint32_t get_error() const {
-    return m_hi2c ? m_hi2c->ErrorCode : HAL_I2C_STATE_NONE;
+    return m_hi2c ? m_hi2c->ErrorCode : HAL_I2C_ERROR_NONE;
   }
 
   // 获取I2C实例索引
