@@ -2,7 +2,6 @@
 #define MODULES_CHASSIS_KINEMATICS_HPP
 
 #include "matrix.hpp"
-#include <cstddef>
 
 namespace gdut {
 
