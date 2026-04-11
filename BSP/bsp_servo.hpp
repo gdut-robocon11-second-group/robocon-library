@@ -6,7 +6,6 @@
 #include "stm32f4xx_hal_tim.h"
 #include "uncopyable.hpp"
 
-
 #include <cstdint>
 #include <functional>
 #include <utility> //因使用到std::move，为提升可移植性，增加
@@ -48,10 +47,12 @@ public:
    *
    * @note 构造函数不会修改硬件，需随后调用 set_angle() 设置初始位置
    */
-  servo(TIM_HandleTypeDef *htim, uint32_t channel,
+  servo(TIM_HandleTypeDef *htim, uint32_t channel, delay_callback_t delay_cb,
         const ServoConfig &config = ServoConfig{1000, 5000, 0, 180, 90})
       : m_htim(htim), m_channel(channel), m_config(config),
-        m_current_angle(config.default_angle) {}
+        m_current_angle(config.default_angle) {
+    m_callbacks.delay_cb = std::move(delay_cb);
+  }
 
   /**
    * @brief 设置舵机角度
@@ -193,9 +194,13 @@ public:
   void register_error_callback(error_callback_t cb) {
     m_callbacks.error_cb = std::move(cb);
   }
-  void register_delay_callback(delay_callback_t cb) {
-    m_callbacks.delay_cb = std::move(cb);
-  }
+
+protected:
+  struct Callbacks {
+    move_complete_callback_t move_complete_cb{nullptr};
+    error_callback_t error_cb{nullptr};
+    delay_callback_t delay_cb{nullptr};
+  };
 
 private:
   TIM_HandleTypeDef *m_htim; //!< 定时器句柄
@@ -203,11 +208,7 @@ private:
   ServoConfig m_config;      //!< 舵机配置参数
   uint8_t m_current_angle;   //!< 当前角度
 
-  struct Callbacks {
-    move_complete_callback_t move_complete_cb{nullptr};
-    error_callback_t error_cb{nullptr};
-    delay_callback_t delay_cb{nullptr};
-  } m_callbacks;
+  Callbacks m_callbacks;
 };
 
 } // namespace gdut

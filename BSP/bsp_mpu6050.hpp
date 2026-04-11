@@ -2,6 +2,7 @@
 #define BSP_MPU6050_HPP
 
 #include "bsp_iic.hpp"
+#include "clock.hpp"
 #include "stm32f4xx_hal.h"
 #include "uncopyable.hpp"
 #include <array>
@@ -436,8 +437,8 @@ public:
    */
   euler_angles get_filtered_euler_angles() {
     // 计算时间差 dt (秒)
-    auto now = std::chrono::steady_clock::now();
-    float dt = 0.01f; // 默认10ms
+    auto now = gdut::steady_clock::now();
+    float dt = 0.01f; // 默认10ms，实则if语句会根据实际时间差调整
     if (m_last_filter_time.time_since_epoch().count() > 0) {
       auto duration = now - m_last_filter_time;
       dt = std::chrono::duration<float>(duration).count();
@@ -562,7 +563,7 @@ public:
     m_prev_roll = 0.0f;
     m_prev_pitch = 0.0f;
     m_prev_yaw = 0.0f;
-    m_last_filter_time = std::chrono::steady_clock::time_point();
+    m_last_filter_time = gdut::steady_clock::time_point{};
   }
 
   /**
@@ -753,7 +754,7 @@ private:
   float m_prev_pitch{0.0f};  // 上一次的pitch角度 (弧度)
   float m_prev_yaw{0.0f};    // 上一次的yaw角度 (弧度) ← 陀螺仪积分
   float m_gyro_alpha{0.98f}; // 陀螺仪权重系数 [0.95-0.99]
-  std::chrono::steady_clock::time_point m_last_filter_time; // 上一次滤波的时间
+  gdut::steady_clock::time_point m_last_filter_time; // 上一次滤波的时间
 
   /**
    *  获取加速度计当前量程的 LSB/g 值
