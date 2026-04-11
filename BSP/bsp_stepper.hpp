@@ -41,7 +41,7 @@ public:
 
   ~pwm_stepper_motor() {
     stop();
-    m_step_timer.register_period_elapsed_callback([]() {});
+    m_step_timer.register_period_elapsed_callback(timer::callback_t{});
   }
 
   void set_direction(bool clockwise) { m_dir_pin.write(clockwise ? 1 : 0); }
