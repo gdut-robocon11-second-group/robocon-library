@@ -38,6 +38,7 @@ public:
   using move_complete_callback_t = gdut::function<void(uint8_t current_angle)>;
   /// 舵机错误回调函数类型
   using error_callback_t = gdut::function<void(HAL_StatusTypeDef error)>;
+  using delay_callback_t = gdut::function<void(uint16_t ms)>;
 
   /**
    * @brief 构造函数
@@ -157,7 +158,9 @@ public:
         return ret;
       }
 
-      HAL_Delay(delay_ms);
+      if (m_callbacks.delay_cb) {
+        std::invoke(m_callbacks.delay_cb, delay_ms);
+      }
     }
     return HAL_OK;
   }
@@ -190,6 +193,9 @@ public:
   void register_error_callback(error_callback_t cb) {
     m_callbacks.error_cb = std::move(cb);
   }
+  void register_delay_callback(delay_callback_t cb) {
+    m_callbacks.delay_cb = std::move(cb);
+  }
 
 private:
   TIM_HandleTypeDef *m_htim; //!< 定时器句柄
@@ -200,6 +206,7 @@ private:
   struct Callbacks {
     move_complete_callback_t move_complete_cb{nullptr};
     error_callback_t error_cb{nullptr};
+    delay_callback_t delay_cb{nullptr};
   } m_callbacks;
 };
 
