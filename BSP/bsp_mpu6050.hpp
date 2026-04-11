@@ -741,7 +741,7 @@ public:
     enable_interrupt(0x40); // WOM_INT_EN
   }
 
-  // 用运动检测
+  // 禁用运动检测
   void disable_motion_detection() {
     disable_interrupt(0x40); // WOM_INT_EN
   }
@@ -755,7 +755,9 @@ public:
 
 private:
   i2c *m_i2c{nullptr};
-  uint8_t m_i2c_addr{0x68};                                  // 默认地址
+  uint8_t m_i2c_addr{
+      static_cast<uint8_t>(static_cast<uint8_t>(mpu6050_addr::low) << 1)};
+  // HAL 使用的 8 位地址格式，默认对应 7 位从机地址 0x68（左移 1 位后为 0xD0）
   accel_range m_current_accel_range{accel_range::range_16g}; // 当前加速度计量程
   gyro_range m_current_gyro_range{gyro_range::range_2000dps}; // 当前陀螺仪量程
   gdut::function<void(std::uint32_t)> m_delay_func;           // 延迟函数对象
