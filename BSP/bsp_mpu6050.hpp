@@ -589,12 +589,12 @@ public:
   void reset_yaw(float yaw_angle = 0.0f) { m_prev_yaw = yaw_angle; }
 
   /**
-   *  获取当前偏航角（Yaw）
+   * @brief 获取当前偏航角（Yaw）
    *
-   偏航角（弧度），范围[-π, π]
+   * 偏航角（弧度），范围[-π, π]
    *
-   Yaw通过陀螺仪Z轴积分得到，长期会有漂移，需要外部传感器（如磁力计）校正
-   *       或者定期调用 reset_yaw() 重新标定
+   * Yaw通过陀螺仪Z轴积分得到，长期会有漂移，需要外部传感器（如磁力计）校正
+   * 或者定期调用 reset_yaw() 重新标定
    */
   float get_yaw() const {
     float yaw = m_prev_yaw;
