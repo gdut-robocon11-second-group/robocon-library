@@ -271,6 +271,9 @@ public:
         std::invoke(m_delay_func, 10);
       }
     }
+    if ((pwr_mgmt & 0x80) != 0) { // 复位未完成
+      return false;
+    }
 
     // 设置时钟源为 PLL (Z轴陀螺仪) 并禁用睡眠模式
     // PWR_MGMT_1: bit6=0(禁用睡眠), bits2-0=011(Z轴陀螺仪PLL)
