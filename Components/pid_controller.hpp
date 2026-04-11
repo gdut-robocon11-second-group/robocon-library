@@ -78,10 +78,7 @@ public:
   }
   [[nodiscard]] bool set_integral(T integral)
   {
-    if (integral < MinOutput || integral > MaxOutput) {
-      return false;
-    }
-    m_integral = integral;
+    m_integral = std::clamp(integral, MinOutput, MaxOutput);
     return true;
   }
   [[nodiscard]] bool
