@@ -68,11 +68,11 @@ public:
     m_data[4] = (code >> 8) & 0xFF;
     m_data[5] = code & 0xFF;
     std::copy(begin, end, m_data.begin() + header_size);
+    m_data[total_size - 2] = (tail >> 8) & 0xFF;
+    m_data[total_size - 1] = tail & 0xFF;
     uint16_t crc = calculate_verification();
     m_data[6] = (crc >> 8) & 0xFF;
     m_data[7] = crc & 0xFF;
-    m_data[total_size - 2] = (tail >> 8) & 0xFF;
-    m_data[total_size - 1] = tail & 0xFF;
   }
 
   template <std::random_access_iterator It>
@@ -85,14 +85,14 @@ public:
     if (*begin != ((header >> 8) & 0xFF) || *(begin + 1) != (header & 0xFF)) {
       return; // Invalid packet header
     }
-    if (std::distance(begin, end) < header_size + tail_size) {
+    if (static_cast<std::size_t>(std::distance(begin, end)) < header_size + tail_size) {
       return; // Not enough data for header and tail, wait for more data
     }
     uint16_t size = *(begin + 2) << 8 | *(begin + 3);
     if (size < header_size + tail_size) {
       return; // Invalid packet size
     }
-    if (std::distance(begin, end) < size) {
+    if (static_cast<std::size_t>(std::distance(begin, end)) < size) {
       return;
     }
     if (*(begin + size - 2) != ((tail >> 8) & 0xFF) ||

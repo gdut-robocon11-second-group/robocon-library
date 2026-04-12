@@ -6,7 +6,8 @@
 
 - 以 `matrix<T, Rows, Cols>` 作为核心类型
 - 以 `vector<T, Rows>` 作为列向量别名
-- 对 `float` 和 `double` 两个特化版本，底层分别对接 CMSIS-DSP 的 `arm_mat_*_f32` 和 `arm_mat_*_f64`
+- 对 `float` 和 `double` 两个特化版本提供完整实现
+- 逆矩阵计算对接 CMSIS-DSP；常规加减乘/转置默认使用模板循环实现，其中 `matrix<float, ...>` 在较大矩阵时会按尺寸阈值切换到 CMSIS-DSP 分支
 - 通过 CRTP 基类 `base_matrix<Matrix<T, Rows, Cols>>` 提供通用接口
 
 矩阵数据存放在栈上定长数组中，采用行优先（row-major）布局，尺寸和类型约束都在编译期完成。
@@ -32,6 +33,8 @@
 | 范数 | `norm()` | Frobenius 范数 |
 | 归一化 | `normalized()` | 按 Frobenius 范数归一化，范数过小时直接返回自身副本 |
 | 单位矩阵 | `identity()` | 静态成员函数，仅方阵可用 |
+| 全零矩阵 | `zeros()` | 静态成员函数，返回同维度零矩阵 |
+| 全一矩阵 | `ones()` | 静态成员函数，返回同维度全一矩阵 |
 | 元素访问 | `get_value(i, j)` / `operator[](i, j)` | 二维访问，零起始 |
 | 向量访问 | `operator[](i)` | 仅列向量可用 |
 | 原始数据 | `get()` | 返回内部数组指针 |
@@ -49,6 +52,7 @@
 构造和存储特性：
 
 - 默认构造后数据为零初始化
+- 支持 `build_and_clean_mat` / `build_but_not_clean_mat` 构造标签控制初始化策略
 - 支持用 `std::initializer_list` 进行线性初始化
 - 数据按行优先顺序存储在 `m_data[Rows * Cols]` 中
 - `get_handle()` 返回的 CMSIS 句柄直接指向内部数据
@@ -78,11 +82,12 @@ using vector = matrix<T, Rows, 1>;
 
 ```cpp
 T dot(const vector<T, Rows>& a, const vector<T, Rows>& b);
-T operator*(const vector<T, Rows>& a, const vector<T, Rows>& b);
+T operator*(const vector<T, Rows>& a, const vector<T, Rows>& b); // 仅 Rows != 1
 vector<T, 3> cross(const vector<T, 3>& a, const vector<T, 3>& b);
 ```
 
 - `dot` 和 `vector * vector` 都表示点积
+- `vector * vector` 点积仅对 `Rows != 1` 启用
 - `cross` 只对 3 维向量提供叉积
 
 ### 4×4 变换矩阵
@@ -122,6 +127,17 @@ auto e = 2.0f * c;
 
 auto f = c + d;
 auto g = c - d;
+
+auto z = gdut::matrix<float, 2, 3>::zeros();
+auto o = gdut::matrix<float, 2, 3>::ones();
+
+// 构造时不初始化矩阵，由用户负责填充数据
+// 同时提高运算性能，避免不必要的内存写入
+gdut::matrix<float, 2, 2> fast_tmp{gdut::build_but_not_clean_mat};
+fast_tmp[0, 0] = 1.0f;
+fast_tmp[0, 1] = 2.0f;
+fast_tmp[1, 0] = 3.0f;
+fast_tmp[1, 1] = 4.0f;
 ```
 
 ### 方阵操作
@@ -166,6 +182,11 @@ float dp = gdut::dot(x, y);
 vec3f cp = gdut::cross(x, y);
 
 float n = x.norm();
+
+gdut::vector<float, 1> v1{2.0f};
+gdut::vector<float, 1> v2{3.0f};
+// 1维向量使用 dot，避免与 1x1 矩阵乘法冲突
+float dp1 = gdut::dot(v1, v2);
 ```
 
 ### 3D 变换
@@ -205,7 +226,9 @@ auto dinv = dm.inverse();
 - **支持类型**：只对 `float` 和 `double` 提供完整实现
 - **维度检查**：矩阵乘法会在编译期检查左矩阵列数和右矩阵行数是否匹配，并检查元素类型一致
 - **内存布局**：行优先布局，与 CMSIS-DSP 兼容
+- **性能语义**：默认构造清零；内部运算临时对象可使用“未清零构造”减少额外写内存
 - **`operator[]`**：二维访问使用 C++23 的多参数下标语法；向量还支持单参数访问
+- **1 维兼容性**：`vector<T,1>` 不启用 `operator*(vector, vector)` 点乘重载，避免与 `1x1` 矩阵乘法冲突
 - **`make_rotate`**：会自动对轴向量做归一化，零向量属于未定义输入
 - **`inverse()`**：底层直接调用 CMSIS-DSP 的求逆接口，浮点精度不足时建议使用 `double`
 - **`det()`**：高维方阵使用带部分主元的 LU 分解，若主元接近 0 会提前返回 0

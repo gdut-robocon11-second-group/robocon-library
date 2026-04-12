@@ -31,6 +31,7 @@ public:
     this->Kp = Kp;
     return true;
   }
+
   [[nodiscard]] bool set_Ki(T Ki) {
     if (Ki < T{}) {
       return false; // Integral gain must be non-negative
@@ -38,6 +39,7 @@ public:
     this->Ki = Ki;
     return true;
   }
+
   [[nodiscard]] bool set_Kd(T Kd) {
     if (Kd < T{}) {
       return false; // Derivative gain must be non-negative
@@ -45,6 +47,7 @@ public:
     this->Kd = Kd;
     return true;
   }
+
   [[nodiscard]] bool set_dead_zone(T DeadZone) {
     if (DeadZone < T{}) {
       return false; // Dead zone must be non-negative
@@ -52,6 +55,7 @@ public:
     this->DeadZone = DeadZone;
     return true;
   }
+
   [[nodiscard]] bool set_integral_windup_limit(T IntegralWindupLimit) {
     if (IntegralWindupLimit < T{}) {
       return false; // Integral windup limit must be non-negative
@@ -59,6 +63,7 @@ public:
     this->IntegralWindupLimit = IntegralWindupLimit;
     return true;
   }
+
   [[nodiscard]] bool set_output_limits(T MinOutput, T MaxOutput) {
     if (MinOutput >= MaxOutput) {
       return false; // Minimum output must be less than maximum output
@@ -74,6 +79,15 @@ public:
     }
     this->Alpha = Alpha;
     return true;
+  }
+
+  void set_integral(T integral) {
+    if (IntegralWindupLimit > T{}) {
+      m_integral =
+          std::clamp(integral, -IntegralWindupLimit, IntegralWindupLimit);
+    } else {
+      m_integral = integral;
+    }
   }
 
   [[nodiscard]] bool

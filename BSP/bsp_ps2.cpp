@@ -2,9 +2,9 @@
 #include "bsp_spi.hpp"
 #include "cmsis_os2.h"
 
-#include <span>
 #include <algorithm>
 #include <chrono>
+#include <span>
 #include <utility>
 
 namespace gdut {
@@ -59,9 +59,8 @@ bool ps2_controller::transfer_frame(std::span<const uint8_t, 9> tx,
     return false;
   }
 
-  return m_spi->transmit_receive(tx.data(), rx.data(),
-                                 static_cast<uint16_t>(tx.size()),
-                                 k_spi_timeout);
+  return m_spi->transmit_receive(
+      tx.data(), rx.data(), static_cast<uint16_t>(tx.size()), k_spi_timeout);
 }
 
 bool ps2_controller::transfer_packet(std::span<const uint8_t, 9> tx,
@@ -71,7 +70,7 @@ bool ps2_controller::transfer_packet(std::span<const uint8_t, 9> tx,
   }
 
   uint8_t tx_copy[9]{};
-  std::copy(tx.begin(), tx.end(), tx_copy);   // ✅ 正确
+  std::copy(tx.begin(), tx.end(), tx_copy); // ✅ 正确
 
   if (m_pins.set_att) {
     m_pins.set_att(false);
@@ -89,8 +88,10 @@ bool ps2_controller::transfer_packet(std::span<const uint8_t, 9> tx,
     m_pins.delay_ms(1U);
   }
 
-  if (!ok) return false;
-  if (frame_looks_dead(rx)) return false;
+  if (!ok)
+    return false;
+  if (frame_looks_dead(rx))
+    return false;
   return true;
 }
 
@@ -176,8 +177,7 @@ bool ps2_controller::poll() {
   if (m_spi == nullptr) {
     return false;
   }
-  const uint8_t tx[9] = {0x01, 0x42, 0x00, 0x00, 0x00,
-                         0x00, 0x00, 0x00, 0x00};
+  const uint8_t tx[9] = {0x01, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t rx[9]{};
 
   if (!transfer_packet(tx, rx)) {
