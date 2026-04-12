@@ -23,13 +23,10 @@ public:
       : pwm_timer_(pwm_timer), encoder_timer_(encoder_timer),
         pwm_channel_A_(pwm_channel_A),
         direction_gpio_port_(direction_gpio_port),
-        direction_gpio_pin_(direction_gpio_pin), ppr_(ppr),
-        current_encoder_count_(0), total_revolutions_(0.0f),
-        current_speed_(0.0f), enabled_(true) {
+        direction_gpio_pin_(direction_gpio_pin),
+        ppr_(ppr > 0.0f ? ppr : 1.0f), current_encoder_count_(0),
+        total_revolutions_(0.0f), current_speed_(0.0f), enabled_(true) {
     init_encoder_state();
-    if (ppr_ <= 0.0f) {
-      ppr_ = 1.0f; // 防止除以零
-    }
   }
 
   // 移动构造

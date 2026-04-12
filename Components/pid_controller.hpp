@@ -16,64 +16,13 @@ template <typename T> class pid_controller {
 public:
   pid_controller() = default;
 
-  pid_controller(const pid_controller &other)
-      : Kp(other.Kp), Ki(other.Ki), Kd(other.Kd), DeadZone(other.DeadZone),
-        IntegralWindupLimit(other.IntegralWindupLimit),
-        MinOutput(other.MinOutput), MaxOutput(other.MaxOutput),
-        Alpha(other.Alpha), m_integral(other.m_integral),
-        m_prev_error(other.m_prev_error), m_output(other.m_output),
-        m_deriv_filter(other.m_deriv_filter) {}
+  pid_controller(const pid_controller &other) = default;
 
-  pid_controller &operator=(const pid_controller &other) {
-    if (this == std::addressof(other)) {
-      return *this;
-    }
+  pid_controller &operator=(const pid_controller &other) = default;
 
-    Kp = other.Kp;
-    Ki = other.Ki;
-    Kd = other.Kd;
-    DeadZone = other.DeadZone;
-    IntegralWindupLimit = other.IntegralWindupLimit;
-    MinOutput = other.MinOutput;
-    MaxOutput = other.MaxOutput;
-    Alpha = other.Alpha;
+  pid_controller(pid_controller &&other) noexcept = default;
 
-    m_integral = other.m_integral;
-    m_prev_error = other.m_prev_error;
-    m_output = other.m_output;
-    m_deriv_filter = other.m_deriv_filter;
-    return *this;
-  }
-
-  pid_controller(pid_controller &&other) noexcept
-      : Kp(other.Kp), Ki(other.Ki), Kd(other.Kd), DeadZone(other.DeadZone),
-        IntegralWindupLimit(other.IntegralWindupLimit),
-        MinOutput(other.MinOutput), MaxOutput(other.MaxOutput),
-        Alpha(other.Alpha), m_integral(other.m_integral),
-        m_prev_error(other.m_prev_error), m_output(other.m_output),
-        m_deriv_filter(other.m_deriv_filter) {}
-
-  pid_controller &operator=(pid_controller &&other) noexcept {
-    if (this == std::addressof(other)) {
-      return *this;
-    }
-
-    Kp = other.Kp;
-    Ki = other.Ki;
-    Kd = other.Kd;
-    DeadZone = other.DeadZone;
-    IntegralWindupLimit = other.IntegralWindupLimit;
-    MinOutput = other.MinOutput;
-    MaxOutput = other.MaxOutput;
-    Alpha = other.Alpha;
-
-    m_integral = other.m_integral;
-    m_prev_error = other.m_prev_error;
-    m_output = other.m_output;
-    m_deriv_filter = other.m_deriv_filter;
-    return *this;
-  }
-
+  pid_controller &operator=(pid_controller &&other) noexcept = default;
   pid_controller(T Kp, T Ki, T Kd, T DeadZone = T{},
                  T IntegralWindupLimit = T{},
                  T MinOutput = std::numeric_limits<T>::lowest(),
