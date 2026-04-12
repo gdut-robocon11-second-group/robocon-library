@@ -17,17 +17,19 @@ public:
   // direction_gpio_pin:用于控制电机转向的 GPIO 引脚
   // encoder_timer:编码器计数的timer对象指针
   // ppr: 编码器一圈的脉冲数
-  // control_period_sec:控制周期（秒）
   motor(gdut::timer *pwm_timer, uint32_t pwm_channel_A,
         GPIO_TypeDef *direction_gpio_port, uint16_t direction_gpio_pin,
-        gdut::timer *encoder_timer, float ppr, float control_period_sec = 0.01f)
+        gdut::timer *encoder_timer, float ppr)
       : pwm_timer_(pwm_timer), encoder_timer_(encoder_timer),
         pwm_channel_A_(pwm_channel_A),
         direction_gpio_port_(direction_gpio_port),
         direction_gpio_pin_(direction_gpio_pin), ppr_(ppr),
-        control_period_(control_period_sec), current_encoder_count_(0),
-        total_revolutions_(0.0f), current_speed_(0.0f), enabled_(true) {
+        current_encoder_count_(0), total_revolutions_(0.0f),
+        current_speed_(0.0f), enabled_(true) {
     init_encoder_state();
+    if (ppr_ <= 0.0f) {
+      ppr_ = 1.0f; // 防止除以零
+    }
   }
 
   // 移动构造
@@ -36,7 +38,6 @@ public:
         pwm_channel_A_(other.pwm_channel_A_),
         direction_gpio_port_(other.direction_gpio_port_),
         direction_gpio_pin_(other.direction_gpio_pin_), ppr_(other.ppr_),
-        control_period_(other.control_period_),
         current_encoder_count_(other.current_encoder_count_),
         total_revolutions_(other.total_revolutions_),
         current_speed_(other.current_speed_), enabled_(other.enabled_) {
@@ -62,8 +63,11 @@ public:
   }
 
   // 刷新编码器状态（建议在定时器中断中周期调用）
-  void refresh_encoder_state() {
+  void refresh_encoder_state(float control_period_sec) {
     if (!encoder_timer_)
+      return;
+
+    if (control_period_sec <= 0.0f)
       return;
 
     // 读取编码器计数值
@@ -76,7 +80,8 @@ public:
     total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
 
     // 计算当前转速（转/秒）
-    current_speed_ = static_cast<float>(delta_count) / (ppr_ * control_period_);
+    current_speed_ =
+        static_cast<float>(delta_count) / (ppr_ * control_period_sec);
   }
 
 protected:
@@ -119,8 +124,7 @@ private:
   uint16_t direction_gpio_pin_;
 
   // 编码器参数
-  float ppr_;            // 一圈脉冲数
-  float control_period_; // 控制周期
+  float ppr_; // 一圈脉冲数
 
   // 状态变量
   int32_t current_encoder_count_;
