@@ -1,19 +1,50 @@
 #ifndef COMPONENTS_PID_CONTROLLER_HPP
 #define COMPONENTS_PID_CONTROLLER_HPP
 
-#include "uncopyable.hpp"
 #include <algorithm>
+#include <cmath>
 #include <limits>
+#include <memory>
 #include <type_traits>
 
 namespace gdut {
 
-template <typename T> class pid_controller : private gdut::uncopyable {
+template <typename T> class pid_controller {
   static_assert(std::is_floating_point_v<T>,
                 "Template parameter T must be a floating-point type");
 
 public:
   pid_controller() = default;
+
+  pid_controller(const pid_controller &other)
+      : Kp(other.Kp), Ki(other.Ki), Kd(other.Kd), DeadZone(other.DeadZone),
+        IntegralWindupLimit(other.IntegralWindupLimit),
+        MinOutput(other.MinOutput), MaxOutput(other.MaxOutput),
+        Alpha(other.Alpha), m_integral(other.m_integral),
+        m_prev_error(other.m_prev_error), m_output(other.m_output),
+        m_deriv_filter(other.m_deriv_filter) {}
+
+  pid_controller &operator=(const pid_controller &other) {
+    if (this == std::addressof(other)) {
+      return *this;
+    }
+
+    Kp = other.Kp;
+    Ki = other.Ki;
+    Kd = other.Kd;
+    DeadZone = other.DeadZone;
+    IntegralWindupLimit = other.IntegralWindupLimit;
+    MinOutput = other.MinOutput;
+    MaxOutput = other.MaxOutput;
+    Alpha = other.Alpha;
+
+    m_integral = other.m_integral;
+    m_prev_error = other.m_prev_error;
+    m_output = other.m_output;
+    m_deriv_filter = other.m_deriv_filter;
+    return *this;
+  }
+
   pid_controller(pid_controller &&other) noexcept
       : Kp(other.Kp), Ki(other.Ki), Kd(other.Kd), DeadZone(other.DeadZone),
         IntegralWindupLimit(other.IntegralWindupLimit),
@@ -23,7 +54,7 @@ public:
         m_deriv_filter(other.m_deriv_filter) {}
 
   pid_controller &operator=(pid_controller &&other) noexcept {
-    if (this == &other) {
+    if (this == std::addressof(other)) {
       return *this;
     }
 

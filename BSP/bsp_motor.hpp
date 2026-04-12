@@ -1,5 +1,5 @@
-#ifndef motor_HPP
-#define motor_HPP
+#ifndef BSP_MOTOR_HPP
+#define BSP_MOTOR_HPP
 
 #include "bsp_timer.hpp"
 #include "stm32f407xx.h"
@@ -132,4 +132,4 @@ private:
 
 } // namespace gdut
 
-#endif
+#endif // BSP_MOTOR_HPP
