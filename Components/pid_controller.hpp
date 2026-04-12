@@ -17,12 +17,10 @@ public:
   pid_controller() = default;
 
   pid_controller(const pid_controller &other) = default;
-
   pid_controller &operator=(const pid_controller &other) = default;
-
   pid_controller(pid_controller &&other) noexcept = default;
-
   pid_controller &operator=(pid_controller &&other) noexcept = default;
+
   pid_controller(T Kp, T Ki, T Kd, T DeadZone = T{},
                  T IntegralWindupLimit = T{},
                  T MinOutput = std::numeric_limits<T>::lowest(),

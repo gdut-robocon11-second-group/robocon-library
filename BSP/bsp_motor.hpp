@@ -23,9 +23,9 @@ public:
       : pwm_timer_(pwm_timer), encoder_timer_(encoder_timer),
         pwm_channel_A_(pwm_channel_A),
         direction_gpio_port_(direction_gpio_port),
-        direction_gpio_pin_(direction_gpio_pin),
-        ppr_(ppr > 0.0f ? ppr : 1.0f), current_encoder_count_(0),
-        total_revolutions_(0.0f), current_speed_(0.0f), enabled_(true) {
+        direction_gpio_pin_(direction_gpio_pin), ppr_(ppr > 0.0f ? ppr : 1.0f),
+        current_encoder_count_(0), total_revolutions_(0.0f),
+        current_speed_(0.0f), enabled_(true) {
     init_encoder_state();
   }
 
@@ -49,7 +49,7 @@ public:
     return total_revolutions_;
   } // 累计转动圈数
 
-  int32_t get_current_encoder_count() const { return current_encoder_count_; }
+  uint32_t get_current_encoder_count() const { return current_encoder_count_; }
 
   // ----- 控制 -----
   void enable(bool enable) { // 使能或禁用输出
@@ -69,12 +69,24 @@ public:
 
     // 读取编码器计数值
     gdut::timer::timer_proxy encoder_proxy(encoder_timer_);
-    const int32_t previous_encoder_count = current_encoder_count_;
-    current_encoder_count_ = static_cast<int32_t>(encoder_proxy.get_counter());
-    int32_t delta_count = current_encoder_count_ - previous_encoder_count;
+    const uint32_t previous_encoder_count = current_encoder_count_;
+    const uint32_t current_counter = encoder_proxy.get_counter();
+    const uint32_t counter_width = encoder_proxy.get_arr() + 1U;
+    int64_t delta_count = static_cast<int64_t>(current_counter) -
+                          static_cast<int64_t>(previous_encoder_count);
 
-    // 更新累计圈数
-    total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
+    // 处理编码器计数回绕：将差值归一到 [-width/2, width/2]
+    const int64_t half_width = static_cast<int64_t>(counter_width / 2U);
+    if (delta_count > half_width) {
+      delta_count -= static_cast<int64_t>(counter_width);
+    } else if (delta_count < -half_width) {
+      delta_count += static_cast<int64_t>(counter_width);
+    }
+
+    current_encoder_count_ = current_counter;
+
+    // 累计圈数：按增量累加，保留真实累计语义
+    total_revolutions_ += static_cast<float>(delta_count) / ppr_;
 
     // 计算当前转速（转/秒）
     current_speed_ =
@@ -86,11 +98,11 @@ protected:
     if (!encoder_timer_)
       return;
     gdut::timer::timer_proxy proxy(encoder_timer_);
-    current_encoder_count_ = static_cast<int32_t>(proxy.get_counter());
+    current_encoder_count_ = proxy.get_counter();
     total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
   }
 
-  void set_pwm_duty(float duty) { // 设置两个通道的占空比
+  void set_pwm_duty(float duty) { // 通过 GPIO 控制方向，并设置单个 PWM 通道的占空比
     if (!pwm_timer_)
       return;
 
@@ -124,9 +136,9 @@ private:
   float ppr_; // 一圈脉冲数
 
   // 状态变量
-  int32_t current_encoder_count_;
-  float total_revolutions_;
-  float current_speed_; // 转/秒
+  uint32_t current_encoder_count_;
+  float total_revolutions_; // 累计圈数
+  float current_speed_;     // 转/秒
 
   bool enabled_;
 };
