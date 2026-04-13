@@ -13,6 +13,16 @@
 
 > 注意：该类内部包含多个定长矩阵对象，实例栈占用与 `N/L/M` 成正相关。在线程/任务栈较小场景下，请评估 `sizeof(kalman_filter<...>)` 并适当增加栈空间。
 
+## 自适应版本
+
+同一文件还提供了一个自适应版本：`gdut::dynamic_kalman_filter<N, L, M, T>`。
+
+- 维度同样固定在编译期，便于编译器优化
+- 与普通版本相比，它会根据创新残差在线更新 `Q` 和 `R`
+- 更适合 MPU6050 这类噪声会随运动状态变化的传感器场景
+
+这里的 “dynamic” 指的是**协方差自适应更新**，不是运行时改变矩阵维度。
+
 ## 数学模型
 
 预测步骤：
@@ -50,6 +60,30 @@ P \leftarrow \frac{P + P^T}{2}
 $$
 
 用于减小浮点误差导致的非对称问题。
+
+### 自适应协方差更新
+
+自适应版本在每次校正后，会根据残差在线修正协方差：
+
+创新残差：
+
+$$
+e_k = z_k - H\hat{x}_{k|k-1}
+$$
+
+测量噪声协方差的对角更新：
+
+$$
+R_k \leftarrow (1-\rho_r)R_{k-1} + \rho_r\,\mathrm{diag}(e_ke_k^T - HP^-_kH^T)
+$$
+
+过程噪声协方差的对角更新：
+
+$$
+Q_k \leftarrow (1-\rho_q)Q_{k-1} + \rho_q\,\mathrm{diag}((\hat{x}_{k|k}-\hat{x}_{k|k-1})(\hat{x}_{k|k}-\hat{x}_{k|k-1})^T)
+$$
+
+实现里只更新对角项，并对数值范围做了裁剪，避免嵌入式场景里因为异常残差导致协方差发散。
 
 ## 接口说明
 
@@ -91,6 +125,26 @@ $$
 - `get_estimation_error_covariance()`
 - `get_state_estimate()`
 
+## 自适应版本接口
+
+`gdut::dynamic_kalman_filter<N, L, M, T>` 提供和普通版本类似的接口，并额外提供自适应控制：
+
+- `update_prediction(u)`：预测步骤，返回预测状态
+- `update_correction(z)`：校正步骤，同时在线更新 `Q` 和 `R`
+- `set_adaptation_rates(process_rate, measurement_rate)`：设置过程噪声和测量噪声的自适应速率，范围 `[0, 1]`
+- `get_process_adaptation_rate()`：读取过程噪声自适应速率
+- `get_measurement_adaptation_rate()`：读取测量噪声自适应速率
+- `enable_adaptation(true/false)`：启用或关闭协方差自适应
+- `adaptation_enabled()`：查询当前是否启用自适应
+
+### 默认行为
+
+- `adaptive_enabled = true`
+- `q_adapt_rate = 0.02`
+- `r_adapt_rate = 0.05`
+- 仅更新 `Q` / `R` 的对角项
+- 噪声矩阵会被限制在安全范围内，防止数值发散
+
 ## 使用示例（1 维）
 
 ```cpp
@@ -125,6 +179,21 @@ auto p_now = kf.get_estimation_error_covariance();
 - `R` 越大：更不信任测量（响应更慢，更平滑）。
 - 初始 `P0` 较大可加快初期收敛，但也会引入更大更新幅度。
 - 若观测缺失，可只调用 `update_prediction()`。
+
+## MPU6050 使用建议
+
+如果你是给 MPU6050 做姿态/加速度融合，通常建议：
+
+- 状态量优先选“角度 + 零偏”模型
+- 把陀螺仪角速度积分结果作为预测输入
+- 把加速度计估算出的 roll / pitch 作为观测量
+- 打开自适应协方差，让滤波器在静止和剧烈运动之间自动调节权重
+
+一个典型策略是：
+
+- 静止时：`R` 较小，更多信任加速度计
+- 剧烈运动时：残差变大，`R` 自动增大，减少加速度计对姿态的干扰
+- 如果陀螺仪漂移明显，`Q` 会随状态变化自动放大，帮助模型更快跟踪
 
 相关源码：
 - [Components/kalman_filter.hpp](../../Components/kalman_filter.hpp)
