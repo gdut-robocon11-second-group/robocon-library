@@ -36,15 +36,19 @@ bool ps2_controller::transfer_frame(std::span<const uint8_t, 9> tx,
     return false;
   }
 
-  for (uint8_t i = 0; i < static_cast<uint8_t>(tx.size()); ++i) {
+  // 逐字节发送并接收，防止PS2接收不到，但是一般情况下不需要
+  /* for (uint8_t i = 0; i < static_cast<uint8_t>(tx.size()); ++i) {
     uint8_t rx_byte = 0U;
     if (!m_spi->transmit_receive(&tx[i], &rx_byte, 1U, m_cfg.spi_timeout)) {
       return false;
     }
     rx[i] = rx_byte;
   }
+  return true; */
 
-  return true;
+  return m_spi->transmit_receive(tx.data(), rx.data(),
+                                 static_cast<uint8_t>(tx.size()),
+                                 m_cfg.spi_timeout * 9);
 }
 
 bool ps2_controller::transfer_packet(std::span<const uint8_t, 9> tx,

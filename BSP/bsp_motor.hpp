@@ -59,9 +59,9 @@ public:
     } else {
       if (pwm_timer_) {
         pwm_timer_->start();
+        gdut::timer::timer_pwm pwm(pwm_timer_);
+        pwm.pwm_start(pwm_channel_A_);
       }
-      gdut::timer::timer_pwm pwm(pwm_timer_);
-      pwm.pwm_start(pwm_channel_A_);
     }
   }
 
