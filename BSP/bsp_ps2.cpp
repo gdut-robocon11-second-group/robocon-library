@@ -130,6 +130,9 @@ void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
   new_state.left_x = rx[7];
   new_state.left_y = rx[8];
 
+  // 这里PS2手柄在红色灯不亮时摇杆会回传0xFF（而不是127），
+  // 但这时其实是等同于摇杆处于中心位置的，因此把它们都当成127处理。
+  // 但是如果两个遥杆的四个轴都是255的话会被误判，但是危险性不大，先不做特殊处理了。
   if (new_state.left_x == 255 && new_state.left_y == 255 &&
       new_state.right_x == 255 && new_state.right_y == 255) {
     new_state.left_x = 127;
