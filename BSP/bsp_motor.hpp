@@ -56,6 +56,10 @@ public:
     enabled_ = enable;
     if (!enabled_) {
       set_pwm_duty(0.0f);
+    } else {
+      pwm_timer_->start();
+      gdut::timer::timer_pwm pwm(pwm_timer_);
+      pwm.pwm_start(pwm_channel_A_);
     }
   }
 
@@ -93,15 +97,6 @@ public:
         static_cast<float>(delta_count) / (ppr_ * control_period_sec);
   }
 
-protected:
-  void init_encoder_state() {
-    if (!encoder_timer_)
-      return;
-    gdut::timer::timer_proxy proxy(encoder_timer_);
-    current_encoder_count_ = proxy.get_counter();
-    total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
-  }
-
   void set_pwm_duty(float duty) { // 通过 GPIO 控制方向，并设置单个 PWM 通道的占空比
     if (!pwm_timer_)
       return;
@@ -116,12 +111,21 @@ protected:
     gdut::timer::timer_pwm pwm(pwm_timer_);
 
     if (clamped_duty >= 0.0f) {
-      direction_gpio_port_->BSRR = direction_gpio_pin_;
+      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_, GPIO_PIN_RESET);
     } else {
-      direction_gpio_port_->BSRR = static_cast<uint32_t>(direction_gpio_pin_)
-                                   << 16U;
+      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_, GPIO_PIN_SET);
+      compare_A = max_compare - compare_A; // 反转占空比
     }
     pwm.set_duty(pwm_channel_A_, compare_A);
+  }
+
+protected:
+  void init_encoder_state() {
+    if (!encoder_timer_)
+      return;
+    gdut::timer::timer_proxy proxy(encoder_timer_);
+    current_encoder_count_ = proxy.get_counter();
+    total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
   }
 
 private:

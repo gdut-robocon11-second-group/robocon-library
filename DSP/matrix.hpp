@@ -338,7 +338,7 @@ public:
 
   constexpr ~matrix() noexcept = default;
 
-  explicit constexpr matrix(std::initializer_list<value_type> list) {
+  constexpr matrix(std::initializer_list<value_type> list) {
     assert(list.size() <= Rows * Cols &&
            "Initializer list size exceeds matrix capacity");
     std::size_t iter = 0;
@@ -521,7 +521,7 @@ public:
 
   constexpr ~matrix() noexcept = default;
 
-  explicit constexpr matrix(std::initializer_list<value_type> list) {
+  constexpr matrix(std::initializer_list<value_type> list) {
     assert(list.size() <= Rows * Cols &&
            "Initializer list size exceeds matrix capacity");
     std::size_t iter = 0;

@@ -1,56 +1,34 @@
 #include "bsp_ps2.hpp"
 #include "bsp_spi.hpp"
-#include "cmsis_os2.h"
 
-#include <algorithm>
-#include <chrono>
 #include <span>
 #include <utility>
 
 namespace gdut {
 
-static constexpr auto k_spi_timeout = std::chrono::milliseconds(5);
-
-static void default_delay_ms(uint32_t ms) {
-  if (ms == 0U) {
-    return;
-  }
-
-  if (osKernelGetState() == osKernelRunning) {
-    osDelay(ms);
-  }
-}
-
-static bool frame_all_eq(std::span<const uint8_t, 9> rx, uint8_t v) {
-  for (auto b : rx) {
-    if (b != v)
-      return false;
-  }
-  return true;
-}
-
-static bool frame_looks_dead(std::span<const uint8_t, 9> rx) {
-  return frame_all_eq(rx, 0xFF) || frame_all_eq(rx, 0x00);
-}
-
 ps2_controller::ps2_controller(pins_interface pins, spi_proxy *spi)
-    : m_spi(spi), m_pins(std::move(pins)), m_state{}, m_on_change(nullptr) {
-  if (!m_pins.delay_ms) {
-    m_pins.delay_ms = default_delay_ms;
+    : ps2_controller(std::move(pins), spi, config{}) {}
+
+ps2_controller::ps2_controller(pins_interface pins, spi_proxy *spi, config cfg)
+    : m_spi(spi), m_pins(std::move(pins)), m_cfg(std::move(cfg)), m_state{},
+      m_on_change(nullptr) {
+  if (!m_pins.delay_us) {
+    m_pins.delay_us = &ps2_controller::delay_us;
   }
 }
 
-void ps2_controller::init() {
+bool ps2_controller::init() {
   if (m_pins.set_att) {
-    m_pins.set_att(true);
+    std::invoke(m_pins.set_att, true); // 空闲状态 ATT 拉高
   }
 
   if (m_pins.delay_ms) {
-    m_pins.delay_ms(1U);
+    std::invoke(m_pins.delay_ms, 20);
   }
 
   // 自动尝试握手；失败也不阻止后续 poll
   (void)handshake();
+  return true;
 }
 
 bool ps2_controller::transfer_frame(std::span<const uint8_t, 9> tx,
@@ -59,38 +37,45 @@ bool ps2_controller::transfer_frame(std::span<const uint8_t, 9> tx,
     return false;
   }
 
-  return m_spi->transmit_receive(
-      tx.data(), rx.data(), static_cast<uint16_t>(tx.size()), k_spi_timeout);
+  for (uint8_t i = 0; i < static_cast<uint8_t>(tx.size()); ++i) {
+    uint8_t rx_byte = 0U;
+    if (!m_spi->transmit_receive(&tx[i], &rx_byte, 1U, m_cfg.spi_timeout)) {
+      return false;
+    }
+    rx[i] = rx_byte;
+  }
+
+  return true;
 }
 
 bool ps2_controller::transfer_packet(std::span<const uint8_t, 9> tx,
-                                     std::span<uint8_t, 9> rx) {
+                                     std::span<uint8_t, 9> rx,
+                                     bool validate_frame) {
   if (m_spi == nullptr) {
     return false;
   }
 
-  uint8_t tx_copy[9]{};
-  std::copy(tx.begin(), tx.end(), tx_copy); // ✅ 正确
-
+  // 1) 通信开始前先拉低 ATT 并等待保护时间
   if (m_pins.set_att) {
-    m_pins.set_att(false);
+    std::invoke(m_pins.set_att, false);
   }
-  if (m_pins.delay_ms) {
-    m_pins.delay_ms(1U);
-  }
+  // 2) ATT 拉低后至少要等待 m_cfg.att_guard_us 微秒才能开始通信
+  std::invoke(m_pins.delay_us, m_cfg.att_guard_us);
 
-  const bool ok = transfer_frame(std::span<const uint8_t, 9>(tx_copy), rx);
+  // 3) 发送并接收数据
+  const bool ok = transfer_frame(tx, rx);
 
+  // 4) 无论成功与否，通信结束后都要拉高 ATT 并等待保护时间
   if (m_pins.set_att) {
-    m_pins.set_att(true);
+    std::invoke(m_pins.set_att, true);
   }
-  if (m_pins.delay_ms) {
-    m_pins.delay_ms(1U);
-  }
+  // ATT 拉高后至少要等待 m_cfg.att_guard_us 微秒才能进行下一次通信
+  std::invoke(m_pins.delay_us, m_cfg.att_guard_us);
 
+  // 5) 如果通信成功还要验证数据帧是否合法
   if (!ok)
     return false;
-  if (frame_looks_dead(rx))
+  if (validate_frame && !frame_is_valid(rx))
     return false;
   return true;
 }
@@ -103,47 +88,26 @@ bool ps2_controller::handshake() {
   uint8_t rx[9]{};
 
   // 1) 确认设备在线
-  {
-    const uint8_t tx[9] = {0x01, 0x42, 0x00, 0x00, 0x00,
-                           0x00, 0x00, 0x00, 0x00};
-    if (!transfer_packet(tx, rx)) {
-      return false;
-    }
+  if (!transfer_packet(k_cmd_poll, rx, true)) {
+    return false;
   }
 
   // 2) 进入配置模式
-  {
-    const uint8_t tx[9] = {0x01, 0x43, 0x00, 0x01, 0x00,
-                           0x00, 0x00, 0x00, 0x00};
-    if (!transfer_packet(tx, rx)) {
-      return false;
-    }
+  if (!transfer_packet(k_cmd_enter_config, rx, false)) {
+    return false;
   }
 
-  // 3) 尝试设为模拟并锁定
-
-  {
-    const uint8_t tx[9] = {0x01, 0x44, 0x00, 0x01, 0x03,
-                           0x00, 0x00, 0x00, 0x00};
-    (void)transfer_packet(tx, rx);
-  }
+  // 3) 尝试设为模拟并锁定（非关键步骤，失败不立刻返回）
+  (void)transfer_packet(k_cmd_set_analog_lock, rx, false);
 
   // 4) 退出配置模式
-  {
-    const uint8_t tx[9] = {0x01, 0x43, 0x00, 0x00, 0x5A,
-                           0x5A, 0x5A, 0x5A, 0x5A};
-    if (!transfer_packet(tx, rx)) {
-      return false;
-    }
+  if (!transfer_packet(k_cmd_exit_config, rx, false)) {
+    return false;
   }
 
   // 5) 再读一次状态确认
-  {
-    const uint8_t tx[9] = {0x01, 0x42, 0x00, 0x00, 0x00,
-                           0x00, 0x00, 0x00, 0x00};
-    if (!transfer_packet(tx, rx)) {
-      return false;
-    }
+  if (!transfer_packet(k_cmd_poll, rx, true)) {
+    return false;
   }
 
   return true;
@@ -152,23 +116,33 @@ bool ps2_controller::handshake() {
 void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
   ps2_state new_state{};
 
-  // 这里仍然假设 9 字节布局：buttons in rx[3..4], sticks in rx[5..8]
+  // PS2 按键位是低有效：0=按下，1=松开，因此需按位取反后再组合。
   new_state.buttons =
-      static_cast<uint16_t>(rx[3]) | (static_cast<uint16_t>(rx[4]) << 8);
+      static_cast<uint16_t>(static_cast<uint8_t>(~rx[3])) |
+      (static_cast<uint16_t>(static_cast<uint8_t>(~rx[4])) << 8);
 
-  new_state.left_x = rx[5];
-  new_state.left_y = rx[6];
-  new_state.right_x = rx[7];
-  new_state.right_y = rx[8];
+  // rx[5..6] 为右摇杆，rx[7..8] 为左摇杆。
+  new_state.right_x = rx[5];
+  new_state.right_y = rx[6];
+  new_state.left_x = rx[7];
+  new_state.left_y = rx[8];
 
+  if (new_state.left_x == 255 && new_state.left_y == 255 &&
+      new_state.right_x == 255 && new_state.right_y == 255) {
+    new_state.left_x = 127;
+    new_state.left_y = 127;
+    new_state.right_x = 127;
+    new_state.right_y = 127;
+  }
+
+  m_state = new_state;
   if (new_state.buttons != m_state.buttons ||
       new_state.left_x != m_state.left_x ||
       new_state.left_y != m_state.left_y ||
       new_state.right_x != m_state.right_x ||
       new_state.right_y != m_state.right_y) {
-    m_state = new_state;
     if (m_on_change) {
-      m_on_change(m_state);
+      std::invoke(m_on_change, m_state);
     }
   }
 }
@@ -177,10 +151,9 @@ bool ps2_controller::poll() {
   if (m_spi == nullptr) {
     return false;
   }
-  const uint8_t tx[9] = {0x01, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t rx[9]{};
 
-  if (!transfer_packet(tx, rx)) {
+  if (!transfer_packet(k_cmd_poll, rx, true)) {
     return false;
   }
 
@@ -192,6 +165,46 @@ ps2_state ps2_controller::read_state() const { return m_state; }
 
 void ps2_controller::on_change(gdut::function<void(const ps2_state &)> cb) {
   m_on_change = std::move(cb);
+}
+
+bool ps2_controller::frame_all_eq(std::span<const uint8_t, 9> rx, uint8_t v) {
+  for (auto b : rx) {
+    if (b != v)
+      return false;
+  }
+  return true;
+}
+
+bool ps2_controller::frame_looks_dead(std::span<const uint8_t, 9> rx) {
+  return frame_all_eq(rx, 0xFF) || frame_all_eq(rx, 0x00);
+}
+
+bool ps2_controller::is_valid_mode(uint8_t mode) {
+  return mode == k_ps2_mode_digital || mode == k_ps2_mode_analog_red ||
+         mode == k_ps2_mode_analog_pressure;
+}
+
+bool ps2_controller::frame_is_valid(std::span<const uint8_t, 9> rx) {
+  if (frame_looks_dead(rx)) {
+    return false;
+  }
+
+  // 某些 2.4G 接收器 ACK/mode 字节不严格遵循标准，先只过滤死帧提高兼容性。
+  return true;
+}
+
+void ps2_controller::delay_us(uint32_t us) {
+  if (us == 0U) {
+    return;
+  }
+
+  const uint32_t iterations_per_us = (SystemCoreClock / 1000000U) / 5U;
+  const uint32_t count =
+      us * (iterations_per_us == 0U ? 1U : iterations_per_us);
+
+  for (uint32_t i = 0; i < count; ++i) {
+    __NOP();
+  }
 }
 
 } // namespace gdut
