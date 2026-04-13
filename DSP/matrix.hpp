@@ -270,6 +270,12 @@ public:
     return res;
   }
 
+  static Derived constant(std::type_identity_t<T> val) {
+    Derived res{build_but_not_clean_mat};
+    std::fill_n(res.get(), Rows * Cols, val);
+    return res;
+  }
+
 protected:
   Derived *get_derived() { return static_cast<Derived *>(this); }
 

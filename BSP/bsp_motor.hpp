@@ -25,8 +25,13 @@ public:
         direction_gpio_port_(direction_gpio_port),
         direction_gpio_pin_(direction_gpio_pin), ppr_(ppr > 0.0f ? ppr : 1.0f),
         current_encoder_count_(0), total_revolutions_(0.0f),
-        current_speed_(0.0f), enabled_(true) {
+        current_speed_(0.0f) {
     init_encoder_state();
+    if (pwm_timer_) {
+      pwm_timer_->start();
+      gdut::timer::timer_pwm pwm(pwm_timer_);
+      pwm.pwm_start(pwm_channel_A_);
+    }
   }
 
   // 移动构造
@@ -37,7 +42,7 @@ public:
         direction_gpio_pin_(other.direction_gpio_pin_), ppr_(other.ppr_),
         current_encoder_count_(other.current_encoder_count_),
         total_revolutions_(other.total_revolutions_),
-        current_speed_(other.current_speed_), enabled_(other.enabled_) {
+        current_speed_(other.current_speed_) {
     other.pwm_timer_ = nullptr;
     other.encoder_timer_ = nullptr;
   }
@@ -52,18 +57,6 @@ public:
   uint32_t get_current_encoder_count() const { return current_encoder_count_; }
 
   // ----- 控制 -----
-  void enable(bool enable) { // 使能或禁用输出
-    enabled_ = enable;
-    if (!enabled_) {
-      set_pwm_duty(0.0f);
-    } else {
-      if (pwm_timer_) {
-        pwm_timer_->start();
-        gdut::timer::timer_pwm pwm(pwm_timer_);
-        pwm.pwm_start(pwm_channel_A_);
-      }
-    }
-  }
 
   // 刷新编码器状态（建议在定时器中断中周期调用）
   void refresh_encoder_state(float control_period_sec) {
@@ -150,8 +143,6 @@ private:
   uint32_t current_encoder_count_;
   float total_revolutions_; // 累计圈数
   float current_speed_;     // 转/秒
-
-  bool enabled_;
 };
 
 } // namespace gdut

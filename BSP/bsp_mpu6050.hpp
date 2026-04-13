@@ -330,9 +330,9 @@ public:
     }
 
     mpu6050_data data;
-    data.x = static_cast<int16_t>((buffer[0] << 8) | buffer[1]);
-    data.y = static_cast<int16_t>((buffer[2] << 8) | buffer[3]);
-    data.z = static_cast<int16_t>((buffer[4] << 8) | buffer[5]);
+    data.x = be16_to_i16(buffer[0], buffer[1]);
+    data.y = be16_to_i16(buffer[2], buffer[3]);
+    data.z = be16_to_i16(buffer[4], buffer[5]);
     return data;
   }
 
@@ -344,9 +344,9 @@ public:
     }
 
     mpu6050_data data;
-    data.x = static_cast<int16_t>((buffer[0] << 8) | buffer[1]);
-    data.y = static_cast<int16_t>((buffer[2] << 8) | buffer[3]);
-    data.z = static_cast<int16_t>((buffer[4] << 8) | buffer[5]);
+    data.x = be16_to_i16(buffer[0], buffer[1]);
+    data.y = be16_to_i16(buffer[2], buffer[3]);
+    data.z = be16_to_i16(buffer[4], buffer[5]);
     return data;
   }
 
@@ -358,7 +358,7 @@ public:
       return 0.0f;
     }
 
-    int16_t raw = static_cast<int16_t>((buffer[0] << 8) | buffer[1]);
+    int16_t raw = be16_to_i16(buffer[0], buffer[1]);
     return (raw / 340.0f) + 36.53f;
   }
 
@@ -383,16 +383,16 @@ public:
 
     imu_data data;
     // 加速度计
-    data.accel.x = static_cast<int16_t>((buffer[0] << 8) | buffer[1]);
-    data.accel.y = static_cast<int16_t>((buffer[2] << 8) | buffer[3]);
-    data.accel.z = static_cast<int16_t>((buffer[4] << 8) | buffer[5]);
+    data.accel.x = be16_to_i16(buffer[0], buffer[1]);
+    data.accel.y = be16_to_i16(buffer[2], buffer[3]);
+    data.accel.z = be16_to_i16(buffer[4], buffer[5]);
     // 温度
-    int16_t temp_raw = static_cast<int16_t>((buffer[6] << 8) | buffer[7]);
+    int16_t temp_raw = be16_to_i16(buffer[6], buffer[7]);
     data.temperature = (temp_raw / 340.0f) + 36.53f;
     // 陀螺仪
-    data.gyro.x = static_cast<int16_t>((buffer[8] << 8) | buffer[9]);
-    data.gyro.y = static_cast<int16_t>((buffer[10] << 8) | buffer[11]);
-    data.gyro.z = static_cast<int16_t>((buffer[12] << 8) | buffer[13]);
+    data.gyro.x = be16_to_i16(buffer[8], buffer[9]);
+    data.gyro.y = be16_to_i16(buffer[10], buffer[11]);
+    data.gyro.z = be16_to_i16(buffer[12], buffer[13]);
 
     // 转换为物理单位 (使用动态量程转换因子)
     float accel_lsb = get_accel_lsb_per_g();
@@ -757,6 +757,17 @@ public:
   }
 
 private:
+  static int16_t be16_to_i16(uint8_t msb, uint8_t lsb) {
+    const uint16_t raw_u =
+        (static_cast<uint16_t>(msb) << 8) | static_cast<uint16_t>(lsb);
+    // 避免对超范围值直接做有符号窄化转换（实现定义行为）。
+    // 先在 int32_t 中做符号扩展，再转换到 int16_t。
+    if (raw_u <= 0x7FFFu) {
+      return static_cast<int16_t>(raw_u);
+    }
+    return static_cast<int16_t>(static_cast<int32_t>(raw_u) - 0x10000);
+  }
+
   i2c *m_i2c{nullptr};
   uint8_t m_i2c_addr{
       static_cast<uint8_t>(static_cast<uint8_t>(mpu6050_addr::low) << 1)};
