@@ -99,7 +99,8 @@ public:
         static_cast<float>(delta_count) / (ppr_ * control_period_sec);
   }
 
-  void set_pwm_duty(float duty) { // 通过 GPIO 控制方向，并设置单个 PWM 通道的占空比
+  // 通过 GPIO 控制方向，并设置单个 PWM 通道的占空比
+  void set_pwm_duty(float duty) {
     if (!pwm_timer_)
       return;
 
@@ -113,10 +114,14 @@ public:
     gdut::timer::timer_pwm pwm(pwm_timer_);
 
     if (clamped_duty >= 0.0f) {
-      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_,
+                        GPIO_PIN_RESET);
     } else {
-      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_, GPIO_PIN_SET);
-      compare_A = max_compare - compare_A; // 反转占空比
+      HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_,
+                        GPIO_PIN_SET);
+      // 方向由独立 GPIO 控制，PWM 幅值保持 |duty| 不变。
+      // 若具体驱动芯片要求“低电平有效 PWM”（占空比语义反相），
+      // 请在定时器极性/通道配置层处理，而不是在此处改变幅值。
     }
     pwm.set_duty(pwm_channel_A_, compare_A);
   }
