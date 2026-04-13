@@ -17,7 +17,7 @@ ps2_controller::ps2_controller(pins_interface pins, spi_proxy *spi, config cfg)
   }
 }
 
-bool ps2_controller::init() {
+void ps2_controller::init() {
   if (m_pins.set_att) {
     std::invoke(m_pins.set_att, true); // 空闲状态 ATT 拉高
   }
@@ -27,8 +27,7 @@ bool ps2_controller::init() {
   }
 
   // 自动尝试握手；失败也不阻止后续 poll
-  (void)handshake();
-  return true;
+  static_cast<void>(handshake());
 }
 
 bool ps2_controller::transfer_frame(std::span<const uint8_t, 9> tx,

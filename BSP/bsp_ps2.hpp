@@ -122,7 +122,7 @@ public:
   ~ps2_controller() = default;
 
   // init: 做基本引脚状态初始化 + 尝试握手（握手失败不会崩溃）
-  bool init();
+  void init();
 
   // handshake: 发送 PS2 配置序列，成功返回 true
   bool handshake();
