@@ -106,15 +106,16 @@ public:
     uint32_t compare_A = static_cast<uint32_t>(duty_abs * max_compare);
     gdut::timer::timer_pwm pwm(pwm_timer_);
 
+    // 注意：此处方向由 GPIO 决定，同时GPIO与PWM作差得到最终比较值
+    // 所以负方向的占空比需要通过 max_compare - compare_A
+    // 来实现反转，而不是直接使用 compare_A
     if (clamped_duty >= 0.0f) {
       HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_,
                         GPIO_PIN_RESET);
     } else {
       HAL_GPIO_WritePin(direction_gpio_port_, direction_gpio_pin_,
                         GPIO_PIN_SET);
-      // 方向由独立 GPIO 控制，PWM 幅值保持 |duty| 不变。
-      // 若具体驱动芯片要求“低电平有效 PWM”（占空比语义反相），
-      // 请在定时器极性/通道配置层处理，而不是在此处改变幅值。
+      compare_A = max_compare - compare_A;
     }
     pwm.set_duty(pwm_channel_A_, compare_A);
   }
