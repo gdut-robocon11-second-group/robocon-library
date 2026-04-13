@@ -135,12 +135,13 @@ void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
     new_state.right_y = 127;
   }
 
+  const bool changed = new_state.buttons != m_state.buttons ||
+                       new_state.left_x != m_state.left_x ||
+                       new_state.left_y != m_state.left_y ||
+                       new_state.right_x != m_state.right_x ||
+                       new_state.right_y != m_state.right_y;
   m_state = new_state;
-  if (new_state.buttons != m_state.buttons ||
-      new_state.left_x != m_state.left_x ||
-      new_state.left_y != m_state.left_y ||
-      new_state.right_x != m_state.right_x ||
-      new_state.right_y != m_state.right_y) {
+  if (changed) {
     if (m_on_change) {
       std::invoke(m_on_change, m_state);
     }

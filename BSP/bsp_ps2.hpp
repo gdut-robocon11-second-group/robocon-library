@@ -24,7 +24,7 @@ namespace gdut {
  * - right_x / right_y：右摇杆原始坐标（回包字节 5/6）
  * - left_x / left_y：左摇杆原始坐标（回包字节 7/8）
  */
-struct ps2_bottons {
+struct ps2_buttons {
   inline static constexpr uint16_t k_select = 0x0001;
   inline static constexpr uint16_t k_l3 = 0x0002;
   inline static constexpr uint16_t k_r3 = 0x0004;
@@ -55,52 +55,52 @@ struct ps2_state {
   }
 
   bool select_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_select);
+    return is_button_pressed(ps2_buttons::k_select);
   }
 
-  bool l3_is_pressed() const { return is_button_pressed(ps2_bottons::k_l3); }
+  bool l3_is_pressed() const { return is_button_pressed(ps2_buttons::k_l3); }
 
-  bool r3_is_pressed() const { return is_button_pressed(ps2_bottons::k_r3); }
+  bool r3_is_pressed() const { return is_button_pressed(ps2_buttons::k_r3); }
 
   bool start_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_start);
+    return is_button_pressed(ps2_buttons::k_start);
   }
 
-  bool up_is_pressed() const { return is_button_pressed(ps2_bottons::k_up); }
+  bool up_is_pressed() const { return is_button_pressed(ps2_buttons::k_up); }
 
   bool right_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_right);
+    return is_button_pressed(ps2_buttons::k_right);
   }
 
   bool down_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_down);
+    return is_button_pressed(ps2_buttons::k_down);
   }
 
   bool left_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_left);
+    return is_button_pressed(ps2_buttons::k_left);
   }
-  bool l2_is_pressed() const { return is_button_pressed(ps2_bottons::k_l2); }
+  bool l2_is_pressed() const { return is_button_pressed(ps2_buttons::k_l2); }
 
-  bool r2_is_pressed() const { return is_button_pressed(ps2_bottons::k_r2); }
+  bool r2_is_pressed() const { return is_button_pressed(ps2_buttons::k_r2); }
 
-  bool l1_is_pressed() const { return is_button_pressed(ps2_bottons::k_l1); }
+  bool l1_is_pressed() const { return is_button_pressed(ps2_buttons::k_l1); }
 
-  bool r1_is_pressed() const { return is_button_pressed(ps2_bottons::k_r1); }
+  bool r1_is_pressed() const { return is_button_pressed(ps2_buttons::k_r1); }
 
   bool triangle_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_triangle);
+    return is_button_pressed(ps2_buttons::k_triangle);
   }
 
   bool circle_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_circle);
+    return is_button_pressed(ps2_buttons::k_circle);
   }
 
   bool cross_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_cross);
+    return is_button_pressed(ps2_buttons::k_cross);
   }
 
   bool square_is_pressed() const {
-    return is_button_pressed(ps2_bottons::k_square);
+    return is_button_pressed(ps2_buttons::k_square);
   }
 };
 
