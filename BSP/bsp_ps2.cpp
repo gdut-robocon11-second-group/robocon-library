@@ -205,11 +205,11 @@ void ps2_controller::delay_us(uint32_t us) {
     return;
   }
 
-  const uint32_t iterations_per_us = (SystemCoreClock / 1000000U) / 5U;
-  const uint32_t count =
-      us * (iterations_per_us == 0U ? 1U : iterations_per_us);
-
-  for (uint32_t i = 0; i < count; ++i) {
+  const uint64_t iterations_per_us =
+      static_cast<uint64_t>((SystemCoreClock / 1000000U) / 5U);
+  const uint64_t count = static_cast<uint64_t>(us) *
+                         (iterations_per_us == 0U ? 1U : iterations_per_us);
+  for (uint64_t i = 0; i < count; ++i) {
     __NOP();
   }
 }
