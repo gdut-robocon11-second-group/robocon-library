@@ -155,11 +155,10 @@ public:
     uint8_t crc;              // crc8校验码
   } __attribute__((packed));
 
-  [[nodiscard]] static write_packet build_write_packet(uint8_t node_address,
-                                                       uint8_t register_address,
-                                                       uint32_t data) {
+  [[nodiscard]] write_packet build_write_packet(uint8_t register_address,
+                                                uint32_t data) {
     write_packet packet;
-    packet.node_address = node_address;
+    packet.node_address = m_node_address;
     // 写操作：寄存器地址占7位，最低位固定为0
     packet.register_address = register_address << 1;
     // 数据按大端格式存储
@@ -179,10 +178,9 @@ public:
     return packet;
   }
 
-  [[nodiscard]] static read_packet build_read_packet(uint8_t node_address,
-                                                     uint8_t register_address) {
+  [[nodiscard]] read_packet build_read_packet(uint8_t register_address) {
     read_packet packet;
-    packet.node_address = node_address;
+    packet.node_address = m_node_address;
     // 读操作：最高位为0，寄存器地址占7位，剩下为0
     packet.register_address = register_address << 1;
 
@@ -253,10 +251,9 @@ public:
 
   // 通过 UART 发送写寄存器命令
   void write_register(
-      uint8_t node_address, uint8_t register_address, uint32_t data,
+      uint8_t register_address, uint32_t data,
       std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
-    write_packet packet =
-        build_write_packet(node_address, register_address, data);
+    write_packet packet = build_write_packet(register_address, data);
     m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
                  delay_ms);
   }
@@ -266,9 +263,9 @@ public:
   // 返回值包含原始响应数据，调用者需要自行验证和解析
   // 特别是data字段需要按大端格式解析
   [[nodiscard]] received_packet read_register(
-      uint8_t node_address, uint8_t register_address,
+      uint8_t register_address,
       std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
-    read_packet packet = build_read_packet(node_address, register_address);
+    read_packet packet = build_read_packet(register_address);
     received_packet response{};
     if (m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
                      delay_ms) != HAL_OK) {
@@ -285,7 +282,7 @@ public:
 
   // 读取TMC2209的TSTEP寄存器（步进时间，n=20）
   uint32_t get_tstep() {
-    auto response = read_register(m_node_address, TSTEP_REG_ADDR);
+    auto response = read_register(TSTEP_REG_ADDR);
     if (validate_response(response, TSTEP_REG_ADDR)) {
       return parse_data(response);
     }
@@ -293,18 +290,18 @@ public:
   }
 
   // 设置TMC2209的TCOOLTHRS寄存器（速度阈值，n=20）
-  void set_tcoolthrs(uint8_t node_address, uint32_t threshold) {
-    write_register(node_address, TCOOLTHRS_REG_ADDR, threshold & 0xFFFFF);
+  void set_tcoolthrs(uint32_t threshold) {
+    write_register(TCOOLTHRS_REG_ADDR, threshold & 0xFFFFF);
   }
 
   // 设置TMC2209的SGTHRS寄存器（过流阈值，n=8）
-  void set_stallguard_threshold(uint8_t node_address, uint8_t threshold) {
-    write_register(node_address, SGTHRS_REG_ADDR, threshold);
+  void set_stallguard_threshold(uint8_t threshold) {
+    write_register(SGTHRS_REG_ADDR, threshold);
   }
 
   // 读取TMC2209的SG_RESULT寄存器（StallGuard结果，n=10）
-  [[nodiscard]] uint16_t get_stallguard_result(uint8_t node_address) {
-    auto result = read_register(node_address, SG_RESULT_REG_ADDR);
+  [[nodiscard]] uint16_t get_stallguard_result() {
+    auto result = read_register(SG_RESULT_REG_ADDR);
     if (validate_response(result, SG_RESULT_REG_ADDR)) {
       return static_cast<uint16_t>(parse_data(result) & 0x03FF);
     }
@@ -313,17 +310,17 @@ public:
 
   // 设置TMC2209的COOLCONF寄存器（散热配置，n=16）
   // 参数说明：
-  void set_coolconf(uint8_t node_address, uint8_t seimin, uint8_t sedn,
-                    uint8_t semax, uint8_t seup, uint8_t semin) {
+  void set_coolconf(uint8_t seimin, uint8_t sedn, uint8_t semax, uint8_t seup,
+                    uint8_t semin) {
     uint32_t coolconf_value = ((static_cast<uint32_t>(seimin) & 0x1) << 15) |
                               ((static_cast<uint32_t>(sedn) & 0x3) << 13) |
                               ((static_cast<uint32_t>(semax) & 0xF) << 8) |
                               ((static_cast<uint32_t>(seup) & 0x3) << 5) |
                               (static_cast<uint32_t>(semin) & 0xF);
-    write_register(node_address, COOLCONF_REG_ADDR, coolconf_value);
+    write_register(COOLCONF_REG_ADDR, coolconf_value);
   }
 
-  void init() { set_tcoolthrs(m_node_address, 10000); }
+  void init() { set_tcoolthrs(10000); }
 
 private:
   gdut::uart *m_uart;
