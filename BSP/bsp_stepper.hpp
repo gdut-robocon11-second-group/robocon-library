@@ -27,7 +27,6 @@ class stepper_motor : private uncopyable {
 public:
   /**
    * @param dir_pin       DIR 引脚
-   * @param enable_pin    ENABLE 引脚（低电平有效）
    * @param step_timer    已配置为PWM模式的 timer 对象
    * @param pwm_channel   PWM通道（TIM_CHANNEL_1 ~ TIM_CHANNEL_4）
    */
@@ -253,23 +252,28 @@ public:
   static constexpr uint8_t COOLCONF_REG_ADDR = 0x42;  // COOLCONF寄存器地址
 
   // 通过 UART 发送写寄存器命令
-  void write_register(uint8_t node_address, uint8_t register_address,
-                      uint32_t data) {
+  void write_register(
+      uint8_t node_address, uint8_t register_address, uint32_t data,
+      std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
     write_packet packet =
         build_write_packet(node_address, register_address, data);
-    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet));
+    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
+                 delay_ms);
   }
 
   // 通过 UART 发送读寄存器命令并等待响应
   // 注意：此函数会阻塞直到收到响应，实际使用时建议在单独的线程中调用
   // 返回值包含原始响应数据，调用者需要自行验证和解析
   // 特别是data字段需要按大端格式解析
-  received_packet read_register(uint8_t node_address,
-                                uint8_t register_address) {
+  received_packet read_register(
+      uint8_t node_address, uint8_t register_address,
+      std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
     read_packet packet = build_read_packet(node_address, register_address);
-    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet));
+    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
+                 delay_ms);
     received_packet response;
-    m_uart->receive(reinterpret_cast<uint8_t *>(&response), sizeof(response));
+    m_uart->receive(reinterpret_cast<uint8_t *>(&response), sizeof(response),
+                    delay_ms);
     return response;
   }
 

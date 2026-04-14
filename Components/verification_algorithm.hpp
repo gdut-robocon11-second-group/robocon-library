@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_VERIFICATION_ALGORITHM_HPP
 #define COMPONENTS_VERIFICATION_ALGORITHM_HPP
 
+#include <array>
 #include <cstdint>
 
 namespace gdut {
@@ -79,7 +80,7 @@ protected:
         ++body_iter;
         continue;
       }
-      crc = crc8_table[crc ^ static_cast<unsigned char>(*body_iter++)];
+      crc = crc8_table[crc ^ static_cast<uint8_t>(*body_iter++)];
     }
     return crc;
   }
@@ -93,12 +94,12 @@ protected:
         ++body_iter;
         continue;
       }
-      crc = crc8_table[crc ^ static_cast<unsigned char>(*body_iter++)];
+      crc = crc8_table[crc ^ static_cast<uint8_t>(*body_iter++)];
     }
-    return crc == 0;
+    return code_loc != end && crc == static_cast<uint8_t>(*code_loc);
   }
 
-  static constexpr uint8_t crc8_table[256] = {
+  static constexpr std::array<uint8_t, 256> crc8_table = {
       0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15, 0x38, 0x3f, 0x36, 0x31,
       0x24, 0x23, 0x2a, 0x2d, 0x70, 0x77, 0x7e, 0x79, 0x6c, 0x6b, 0x62, 0x65,
       0x48, 0x4f, 0x46, 0x41, 0x54, 0x53, 0x5a, 0x5d, 0xe0, 0xe7, 0xee, 0xe9,
@@ -153,7 +154,7 @@ protected:
     return crc;
   }
 
-  static constexpr uint16_t crc16_table[256] = {
+  static constexpr std::array<uint16_t, 256> crc16_table = {
       0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241, 0xC601,
       0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440, 0xCC01, 0x0CC0,
       0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40, 0x0A00, 0xCAC1, 0xCB81,
