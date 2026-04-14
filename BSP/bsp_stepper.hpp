@@ -155,9 +155,9 @@ public:
     uint8_t crc;              // crc8校验码
   } __attribute__((packed));
 
-  static write_packet build_write_packet(uint8_t node_address,
-                                         uint8_t register_address,
-                                         uint32_t data) {
+  [[nodiscard]] static write_packet build_write_packet(uint8_t node_address,
+                                                       uint8_t register_address,
+                                                       uint32_t data) {
     write_packet packet;
     packet.node_address = node_address;
     // 写操作：寄存器地址占7位，最低位固定为0
@@ -179,8 +179,8 @@ public:
     return packet;
   }
 
-  static read_packet build_read_packet(uint8_t node_address,
-                                       uint8_t register_address) {
+  [[nodiscard]] static read_packet build_read_packet(uint8_t node_address,
+                                                     uint8_t register_address) {
     read_packet packet;
     packet.node_address = node_address;
     // 读操作：最高位为0，寄存器地址占7位，剩下为0
@@ -196,7 +196,7 @@ public:
     return packet;
   }
 
-  static bool check_crc(const received_packet &packet) {
+  [[nodiscard]] static bool check_crc(const received_packet &packet) {
     verify_algorithm_t crc_algo;
     return crc_algo.verify(reinterpret_cast<const uint8_t *>(&packet),
                            reinterpret_cast<const uint8_t *>(&packet) +
@@ -204,8 +204,8 @@ public:
                            reinterpret_cast<const uint8_t *>(&packet.crc));
   }
 
-  static bool validate_response(const received_packet &packet,
-                                uint8_t expected_register) {
+  [[nodiscard]] static bool validate_response(const received_packet &packet,
+                                              uint8_t expected_register) {
     // 校验帧头、寄存器地址和CRC
     if (packet.header != 0x90) {
       return false;
@@ -219,7 +219,7 @@ public:
     return true;
   }
 
-  static uint32_t parse_data(const received_packet &packet) {
+  [[nodiscard]] static uint32_t parse_data(const received_packet &packet) {
     // 数据按大端格式存储
     const uint8_t *data_bytes = reinterpret_cast<const uint8_t *>(&packet.data);
     uint32_t data = (static_cast<uint32_t>(data_bytes[0]) << 24) |
@@ -265,13 +265,16 @@ public:
   // 注意：此函数会阻塞直到收到响应，实际使用时建议在单独的线程中调用
   // 返回值包含原始响应数据，调用者需要自行验证和解析
   // 特别是data字段需要按大端格式解析
-  received_packet read_register(
+  [[nodiscard]] received_packet read_register(
       uint8_t node_address, uint8_t register_address,
       std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
     read_packet packet = build_read_packet(node_address, register_address);
-    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
-                 delay_ms);
-    received_packet response;
+    received_packet response{};
+    if (m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
+                     delay_ms) != HAL_OK) {
+      // 发送失败，返回一个无效的响应
+      return response;
+    }
     m_uart->receive(reinterpret_cast<uint8_t *>(&response), sizeof(response),
                     delay_ms);
     return response;
