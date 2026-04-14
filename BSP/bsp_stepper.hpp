@@ -160,7 +160,7 @@ public:
                                          uint32_t data) {
     write_packet packet;
     packet.node_address = node_address;
-    // 写操作：最高位为1，寄存器地址占7位，剩下为0
+    // 写操作：寄存器地址占7位，最低位固定为0
     packet.register_address = register_address << 1;
     // 数据按大端格式存储
     uint8_t *data_bytes = reinterpret_cast<uint8_t *>(&packet.data);
