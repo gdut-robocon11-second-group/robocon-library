@@ -48,7 +48,7 @@ public:
   /**
    * @brief 设置速度（单位：steps/s）
    * @note 基于实际定时器 PSC 配置计算周期
-   * 
+   *
    * 注意：如果步数为0或速度为0，则会立即停止运动
    * ARR如果过小可能导致定时器不稳定，函数内部会限制最大速度以避免这种情况
    */
@@ -268,12 +268,12 @@ public:
   static constexpr uint8_t COOLCONF_REG_ADDR = 0x42;  // COOLCONF寄存器地址
 
   // 通过 UART 发送写寄存器命令
-  void write_register(
+  bool write_register(
       uint8_t register_address, uint32_t data,
       std::chrono::milliseconds delay_ms = std::chrono::milliseconds::max()) {
     write_packet packet = build_write_packet(register_address, data);
-    m_uart->send(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet),
-                 delay_ms);
+    return m_uart->send(reinterpret_cast<const uint8_t *>(&packet),
+                        sizeof(packet), delay_ms) == HAL_OK;
   }
 
   // 通过 UART 发送读寄存器命令并等待响应
