@@ -135,17 +135,17 @@ public:
 
   struct write_packet {
     uint8_t header = 0x90;    // 固定帧头0x90
-    uint8_t node_address;     // TMC2209地址 (支支持四个地址：0x00~0x03)
+    uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
     uint32_t data;            // 4字节数据
-    uint8_t crc;              // crc8校验码，覆盖前面三个字节
+    uint8_t crc;              // crc8校验码，覆盖 crc 前的所有字节（包含 data）
   } __attribute__((packed));
 
   struct read_packet {
     uint8_t header = 0x90;    // 固定帧头0x90
-    uint8_t node_address;     // TMC2209地址 (支支持四个地址：0x00~0x03)
+    uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
-    uint8_t crc;              // crc8校验码，覆盖前面三个字节
+    uint8_t crc;              // crc8校验码
   } __attribute__((packed));
 
   struct received_packet {
@@ -308,9 +308,11 @@ public:
   // 参数说明：
   void set_coolconf(uint8_t node_address, uint8_t seimin, uint8_t sedn,
                     uint8_t semax, uint8_t seup, uint8_t semin) {
-    uint32_t coolconf_value = (seimin & 0x1 << 15) | (sedn & 0x3 << 13) |
-                              (semax & 0xF << 8) | (seup & 0x3 << 5) |
-                              (semin & 0xF);
+    uint32_t coolconf_value = ((static_cast<uint32_t>(seimin) & 0x1) << 15) |
+                              ((static_cast<uint32_t>(sedn) & 0x3) << 13) |
+                              ((static_cast<uint32_t>(semax) & 0xF) << 8) |
+                              ((static_cast<uint32_t>(seup) & 0x3) << 5) |
+                              (static_cast<uint32_t>(semin) & 0xF);
     write_register(node_address, COOLCONF_REG_ADDR, coolconf_value);
   }
 
