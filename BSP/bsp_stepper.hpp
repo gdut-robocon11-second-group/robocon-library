@@ -47,7 +47,10 @@ public:
 
   /**
    * @brief 设置速度（单位：steps/s）
-   * @note 要求定时器分辨率为 1us（计数频率 1MHz）
+   * @note 基于实际定时器 PSC 配置计算周期
+   * 
+   * 注意：如果步数为0或速度为0，则会立即停止运动
+   * ARR如果过小可能导致定时器不稳定，函数内部会限制最大速度以避免这种情况
    */
   void set_speed(uint32_t steps_per_sec) {
     if (steps_per_sec == 0) {
@@ -55,23 +58,38 @@ public:
       return;
     }
 
-    // 限制最大速度，防止 ARR 过小导致不稳定
-    if (steps_per_sec > 50000)
-      steps_per_sec = 50000;
-
     auto *htim = m_step_timer->get_htim();
     if (!htim)
       return;
 
-    // 定时器计数频率为 1MHz → 周期单位为 us
-    uint32_t period_us = 1000000UL / steps_per_sec;
-    if (period_us == 0)
-      period_us = 1;
+    gdut::timer::timer_proxy timer_proxy{m_step_timer};
+    const uint32_t psc = timer_proxy.get_psc();
+    const uint32_t apb_clk = timer_proxy.get_apb_clock();
 
-    __HAL_TIM_SET_AUTORELOAD(htim, period_us - 1);
+    // 限制最大速度，防止 ARR 过小导致不稳定
+    if (steps_per_sec > 50000) {
+      steps_per_sec = 50000;
+    }
 
-    // 50% 占空比
-    uint32_t ccr = (period_us + 1) / 2;
+    // 计算定时器分辨率（纳秒）
+    // resolution_ns = (PSC + 1) / APB_CLK * 1e9
+    uint64_t timer_resolution_ns =
+        static_cast<uint64_t>(psc + 1) * 1000000000ULL / apb_clk;
+
+    // 计算所需周期（纳秒）
+    uint64_t period_ns = 1000000000ULL / steps_per_sec;
+
+    // 周期对应的计数器值 = period_ns / timer_resolution_ns
+    uint32_t period_counts =
+        static_cast<uint32_t>(period_ns / timer_resolution_ns);
+    if (period_counts == 0)
+      period_counts = 1;
+
+    // ARR = 周期计数 - 1（硬件计数器是从0开始）
+    __HAL_TIM_SET_AUTORELOAD(htim, period_counts - 1);
+
+    // 50% 占空比：CCR = period_counts / 2
+    uint32_t ccr = (period_counts + 1) / 2;
 
     timer::timer_pwm pwm_helper(m_step_timer);
     pwm_helper.set_duty(m_pwm_channel, ccr);
