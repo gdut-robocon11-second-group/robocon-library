@@ -136,7 +136,7 @@ public:
     uint8_t header = 0x90;    // 固定帧头0x90
     uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
-    uint32_t data;            // 4字节数据
+    uint8_t data[4];          // 4字节数据
     uint8_t crc;              // crc8校验码，覆盖 crc 前的所有字节（包含 data）
   } __attribute__((packed));
 
@@ -151,7 +151,7 @@ public:
     uint8_t header;           // 固定帧头0x90
     uint8_t master_address;   // 主机地址，默认为0xFF
     uint8_t register_address; // 7位寄存器地址，最低为0
-    uint32_t data;            // 4字节数据 (注意不能直接读取，存在字节序问题)
+    uint8_t data[4];          // 4字节数据 (注意不能直接读取，存在字节序问题)
     uint8_t crc;              // crc8校验码
   } __attribute__((packed));
 
@@ -162,7 +162,7 @@ public:
     // 写操作：寄存器地址占7位，最低位固定为0
     packet.register_address = register_address << 1;
     // 数据按大端格式存储
-    uint8_t *data_bytes = reinterpret_cast<uint8_t *>(&packet.data);
+    uint8_t *data_bytes = packet.data;
     data_bytes[0] = (data >> 24) & 0xFF;
     data_bytes[1] = (data >> 16) & 0xFF;
     data_bytes[2] = (data >> 8) & 0xFF;
@@ -219,7 +219,7 @@ public:
 
   [[nodiscard]] static uint32_t parse_data(const received_packet &packet) {
     // 数据按大端格式存储
-    const uint8_t *data_bytes = reinterpret_cast<const uint8_t *>(&packet.data);
+    const uint8_t *data_bytes = packet.data;
     uint32_t data = (static_cast<uint32_t>(data_bytes[0]) << 24) |
                     (static_cast<uint32_t>(data_bytes[1]) << 16) |
                     (static_cast<uint32_t>(data_bytes[2]) << 8) |
