@@ -265,6 +265,9 @@ public:
       attach_dma_rx(hdma_rx);
       attach_dma_tx(hdma_tx);
     }
+    if (is_half_duplex_mode()) {
+      return HAL_HalfDuplex_Init(m_huart);
+    }
     return HAL_UART_Init(m_huart);
   }
 
@@ -309,6 +312,11 @@ public:
   HAL_StatusTypeDef
   send(const uint8_t *data, uint16_t size,
        std::chrono::milliseconds timeout = std::chrono::milliseconds::max()) {
+    if (is_half_duplex_mode()) {
+      if (HAL_HalfDuplex_EnableTransmitter(m_huart) != HAL_OK) {
+        return HAL_ERROR;
+      }
+    }
     return HAL_UART_Transmit(m_huart, const_cast<uint8_t *>(data), size,
                              timeout.count() >
                                      std::numeric_limits<uint32_t>::max()
@@ -320,6 +328,12 @@ public:
   HAL_StatusTypeDef receive(
       uint8_t *data, uint16_t size,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::max()) {
+    if (is_half_duplex_mode()) {
+      if (HAL_HalfDuplex_EnableReceiver(m_huart) != HAL_OK) {
+        return HAL_ERROR;
+      }
+      __HAL_UART_CLEAR_OREFLAG(m_huart);
+    }
     return HAL_UART_Receive(m_huart, data, size,
                             timeout.count() >
                                     std::numeric_limits<uint32_t>::max()
@@ -394,7 +408,12 @@ public:
   void set_over_sampling(uint32_t over_sampling) {
     m_huart->Init.OverSampling = over_sampling;
   }
-  HAL_StatusTypeDef apply_config() { return HAL_UART_Init(m_huart); }
+  HAL_StatusTypeDef apply_config() {
+    if (is_half_duplex_mode()) {
+      return HAL_HalfDuplex_Init(m_huart);
+    }
+    return HAL_UART_Init(m_huart);
+  }
 
   // DMA关联函数
   void attach_dma_rx(DMA_HandleTypeDef *hdma_rx) {
@@ -547,6 +566,13 @@ protected:
   };
 
 private:
+  [[nodiscard]] bool is_half_duplex_mode() const {
+    if (!m_huart || !m_huart->Instance) {
+      return false;
+    }
+    return (m_huart->Instance->CR3 & USART_CR3_HDSEL) != 0U;
+  }
+
   UART_HandleTypeDef *m_huart{nullptr};  // UART句柄
   DMA_HandleTypeDef *m_hdma_rx{nullptr}; // 接收DMA句柄
   DMA_HandleTypeDef *m_hdma_tx{nullptr}; // 发送DMA句柄
