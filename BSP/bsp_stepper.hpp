@@ -21,7 +21,7 @@ namespace gdut {
  *   1. STEP引脚 → 对应定时器的 PWM Generation 通道（AF模式）
  *   2. 定时器时钟 + PSC 配置为 1us 分辨率（即计数频率 1MHz）
  *   3. 必须开启 Update Interrupt（NVIC）
- *   4. DIR 和 ENABLE 为普通 GPIO Output
+ *   4. DIR 为普通 GPIO Output
  */
 class stepper_motor : private uncopyable {
 public:
