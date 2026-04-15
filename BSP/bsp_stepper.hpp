@@ -216,12 +216,11 @@ struct tmc2209_packet {
     }
     size_t size() const { return sizeof(received_packet); }
     bool is_valid() const {
-      if (header != 0x90) {
+      if (header != 0x50) {
         return false;
       }
       verify_algorithm_t crc_algo;
-      return crc_algo.verify(data(), data() + sizeof(received_packet) - 1,
-                             &crc);
+      return crc_algo.verify(data(), data() + sizeof(received_packet), &crc);
     }
 
     uint32_t get_value() const {
@@ -239,7 +238,7 @@ struct tmc2209_packet {
                      uint32_t data) {
     write_packet packet;
     packet.node_address = node_address;
-    // 写操作：寄存器地址占7位，最低位固定为0
+    // 写操作：寄存器地址占7位，最低位为 R/W 位，写时置 1
     packet.register_address = std::to_underlying(register_address) << 1 | 0x01;
     // 数据按大端格式存储
     uint8_t *data_bytes = packet.payload;
