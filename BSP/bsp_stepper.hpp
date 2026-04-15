@@ -175,7 +175,7 @@ struct tmc2209_packet {
   using verify_algorithm_t = gdut::crc8_algorithm;
 
   struct write_packet {
-    uint8_t header = 0x50;    // 固定帧头0x55 or 0xA0
+    uint8_t header = 0x50;    // 固定帧头0x50
     uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
     uint8_t payload[4];       // 4字节数据
@@ -190,7 +190,7 @@ struct tmc2209_packet {
   } __attribute__((packed));
 
   struct read_packet {
-    uint8_t header = 0x50;    // 固定帧头0x55 or 0xA0
+    uint8_t header = 0x50;    // 固定帧头0x50
     uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
     uint8_t crc;              // crc8校验码
