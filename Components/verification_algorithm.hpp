@@ -127,6 +127,7 @@ protected:
         currentByte = currentByte >> 1;
       } // for CRC bit
     } // for message byte
+    return crc_val == *code_loc;
   }
 };
 
