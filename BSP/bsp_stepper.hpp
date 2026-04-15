@@ -8,7 +8,6 @@
 #include "verification_algorithm.hpp"
 #include <atomic>
 #include <cstdint>
-#include <ctime>
 
 namespace gdut {
 
@@ -20,7 +19,7 @@ namespace gdut {
  *
  * CubeMX 配置要求：
  *   1. STEP引脚 → 对应定时器的 PWM Generation 通道（AF模式）
- *   2. 定时器时钟 + PSC 配置为 1us 分辨率（即计数频率 1MHz）
+ *   2. 定时器 PSC 可按实际需求配置；计时分辨率会影响可实现的速度范围与调节精度
  *   3. 必须开启 Update Interrupt（NVIC）
  *   4. DIR 为普通 GPIO Output
  */
@@ -44,7 +43,11 @@ public:
     m_step_timer->register_period_elapsed_callback(timer::callback_t{});
   }
 
-  void set_direction(bool clockwise) { m_dir_pin->write(clockwise); }
+  void set_direction(bool clockwise) {
+    if (m_dir_pin) {
+      m_dir_pin->write(clockwise);
+    }
+  }
 
   /**
    * @brief 设置速度（单位：steps/s）
@@ -60,8 +63,10 @@ public:
     }
 
     auto *htim = m_step_timer->get_htim();
-    if (!htim)
+    if (!htim) {
+      stop();
       return;
+    }
 
     gdut::timer::timer_proxy timer_proxy{m_step_timer};
     const uint32_t psc = timer_proxy.get_psc();
