@@ -253,7 +253,7 @@ public:
   uart(UART_HandleTypeDef *huart, DMA_HandleTypeDef *hdma_rx = nullptr,
        DMA_HandleTypeDef *hdma_tx = nullptr)
       : m_huart(huart), m_hdma_rx(nullptr), m_hdma_tx(nullptr) {
-    init(hdma_rx, hdma_tx);
+    // init(hdma_rx, hdma_tx);
   }
 
   ~uart() noexcept { deinit(); }
