@@ -175,26 +175,63 @@ struct tmc2209_packet {
   using verify_algorithm_t = gdut::crc8_algorithm;
 
   struct write_packet {
-    uint8_t header = 0x55;    // 固定帧头0x55 or 0xA0
+    uint8_t header = 0x50;    // 固定帧头0x55 or 0xA0
     uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
-    uint8_t data[4];          // 4字节数据
+    uint8_t payload[4];       // 4字节数据
     uint8_t crc;              // crc8校验码，覆盖 crc 前的所有字节（包含 data）
+
+    uint8_t *data() { return reinterpret_cast<uint8_t *>(this); }
+    const uint8_t *data() const {
+      return reinterpret_cast<const uint8_t *>(this);
+    }
+    size_t size() const { return sizeof(write_packet); }
+
   } __attribute__((packed));
 
   struct read_packet {
-    uint8_t header = 0x55;    // 固定帧头0x55 or 0xA0
+    uint8_t header = 0x50;    // 固定帧头0x55 or 0xA0
     uint8_t node_address;     // TMC2209地址 (只支持四个地址)
     uint8_t register_address; // 7位寄存器地址，最低为0
     uint8_t crc;              // crc8校验码
+
+    uint8_t *data() { return reinterpret_cast<uint8_t *>(this); }
+    const uint8_t *data() const {
+      return reinterpret_cast<const uint8_t *>(this);
+    }
+    size_t size() const { return sizeof(read_packet); }
+
   } __attribute__((packed));
 
   struct received_packet {
     uint8_t header;           // 固定帧头0x90
     uint8_t master_address;   // 主机地址，默认为0xFF
     uint8_t register_address; // 7位寄存器地址，最低为0
-    uint8_t data[4];          // 4字节数据 (注意不能直接读取，存在字节序问题)
+    uint8_t payload[4];       // 4字节数据 (注意不能直接读取，存在字节序问题)
     uint8_t crc;              // crc8校验码
+
+    uint8_t *data() { return reinterpret_cast<uint8_t *>(this); }
+    const uint8_t *data() const {
+      return reinterpret_cast<const uint8_t *>(this);
+    }
+    size_t size() const { return sizeof(received_packet); }
+    bool is_valid() const {
+      if (header != 0x90) {
+        return false;
+      }
+      verify_algorithm_t crc_algo;
+      return crc_algo.verify(data(), data() + sizeof(received_packet) - 1,
+                             &crc);
+    }
+
+    uint32_t get_value() const {
+      // 数据按大端格式存储
+      return (static_cast<uint32_t>(payload[0]) << 24) |
+             (static_cast<uint32_t>(payload[1]) << 16) |
+             (static_cast<uint32_t>(payload[2]) << 8) |
+             static_cast<uint32_t>(payload[3]);
+    }
+
   } __attribute__((packed));
 
   [[nodiscard]] static write_packet
@@ -203,9 +240,9 @@ struct tmc2209_packet {
     write_packet packet;
     packet.node_address = node_address;
     // 写操作：寄存器地址占7位，最低位固定为0
-    packet.register_address = std::to_underlying(register_address) << 1;
+    packet.register_address = std::to_underlying(register_address) << 1 | 0x01;
     // 数据按大端格式存储
-    uint8_t *data_bytes = packet.data;
+    uint8_t *data_bytes = packet.payload;
     data_bytes[0] = (data >> 24) & 0xFF;
     data_bytes[1] = (data >> 16) & 0xFF;
     data_bytes[2] = (data >> 8) & 0xFF;
@@ -213,10 +250,10 @@ struct tmc2209_packet {
 
     // 计算CRC8校验码
     verify_algorithm_t crc_algo;
-    packet.crc = crc_algo.calculate(
-        reinterpret_cast<const uint8_t *>(&packet),
-        reinterpret_cast<const uint8_t *>(&packet) + sizeof(packet),
-        reinterpret_cast<const uint8_t *>(&packet.crc));
+    crc_algo.calculate(reinterpret_cast<const uint8_t *>(&packet),
+                       reinterpret_cast<const uint8_t *>(&packet) +
+                           sizeof(packet),
+                       reinterpret_cast<uint8_t *>(&packet.crc));
 
     return packet;
   }
@@ -229,10 +266,10 @@ struct tmc2209_packet {
     packet.register_address = std::to_underlying(register_address) << 1;
     // 计算CRC8校验码
     verify_algorithm_t crc_algo;
-    packet.crc = crc_algo.calculate(
-        reinterpret_cast<const uint8_t *>(&packet),
-        reinterpret_cast<const uint8_t *>(&packet) + sizeof(packet),
-        reinterpret_cast<const uint8_t *>(&packet.crc));
+    crc_algo.calculate(reinterpret_cast<const uint8_t *>(&packet),
+                       reinterpret_cast<const uint8_t *>(&packet) +
+                           sizeof(packet),
+                       reinterpret_cast<uint8_t *>(&packet.crc));
 
     return packet;
   }
@@ -264,7 +301,7 @@ struct tmc2209_packet {
 
   [[nodiscard]] static uint32_t parse_data(const received_packet &packet) {
     // 数据按大端格式存储
-    const uint8_t *data_bytes = packet.data;
+    const uint8_t *data_bytes = packet.payload;
     uint32_t data = (static_cast<uint32_t>(data_bytes[0]) << 24) |
                     (static_cast<uint32_t>(data_bytes[1]) << 16) |
                     (static_cast<uint32_t>(data_bytes[2]) << 8) |
@@ -275,7 +312,8 @@ struct tmc2209_packet {
 
 class tmc2209_uart_controller : private uncopyable {
 public:
-  static constexpr std::chrono::milliseconds default_timeout = std::chrono::milliseconds(50);
+  static constexpr std::chrono::milliseconds default_timeout =
+      std::chrono::milliseconds(50);
 
   tmc2209_uart_controller(gdut::uart *uart, uint8_t node_address)
       : m_uart(uart), m_node_address(node_address) {}
@@ -283,9 +321,8 @@ public:
   ~tmc2209_uart_controller() = default;
 
   // 通过 UART 发送写寄存器命令
-  bool write_register(
-      tmc2209_register register_address, uint32_t data,
-      std::chrono::milliseconds delay_ms = default_timeout) {
+  bool write_register(tmc2209_register register_address, uint32_t data,
+                      std::chrono::milliseconds delay_ms = default_timeout) {
     tmc2209_packet::write_packet packet = tmc2209_packet::build_write_packet(
         m_node_address, register_address, data);
     return m_uart->send(reinterpret_cast<const uint8_t *>(&packet),
@@ -296,9 +333,9 @@ public:
   // 注意：此函数会阻塞直到收到响应，实际使用时建议在单独的线程中调用
   // 返回值包含原始响应数据，调用者需要自行验证和解析
   // 特别是data字段需要按大端格式解析
-  [[nodiscard]] tmc2209_packet::received_packet read_register(
-      tmc2209_register register_address,
-      std::chrono::milliseconds delay_ms = default_timeout) {
+  [[nodiscard]] tmc2209_packet::received_packet
+  read_register(tmc2209_register register_address,
+                std::chrono::milliseconds delay_ms = default_timeout) {
     tmc2209_packet::read_packet packet =
         tmc2209_packet::build_read_packet(m_node_address, register_address);
     tmc2209_packet::received_packet response{};
@@ -323,17 +360,21 @@ public:
   }
 
   // 设置TMC2209的TCOOLTHRS寄存器（速度阈值，n=20）
-  void set_tcoolthrs(uint32_t threshold, std::chrono::milliseconds delay_ms = default_timeout) {
-    write_register(tmc2209_register::TCOOLTHRS_REG_ADDR, threshold & 0xFFFFF, delay_ms);
+  void set_tcoolthrs(uint32_t threshold,
+                     std::chrono::milliseconds delay_ms = default_timeout) {
+    write_register(tmc2209_register::TCOOLTHRS_REG_ADDR, threshold & 0xFFFFF,
+                   delay_ms);
   }
 
   // 设置TMC2209的SGTHRS寄存器（过流阈值，n=8）
-  void set_stallguard_threshold(uint8_t threshold, std::chrono::milliseconds delay_ms = default_timeout) {
+  void set_stallguard_threshold(
+      uint8_t threshold, std::chrono::milliseconds delay_ms = default_timeout) {
     write_register(tmc2209_register::SGTHRS_REG_ADDR, threshold, delay_ms);
   }
 
   // 读取TMC2209的SG_RESULT寄存器（StallGuard结果，n=10）
-  [[nodiscard]] uint16_t get_stallguard_result(std::chrono::milliseconds delay_ms = default_timeout) {
+  [[nodiscard]] uint16_t
+  get_stallguard_result(std::chrono::milliseconds delay_ms = default_timeout) {
     auto result = read_register(tmc2209_register::SG_RESULT_REG_ADDR, delay_ms);
     if (tmc2209_packet::validate_response(
             result, tmc2209_register::SG_RESULT_REG_ADDR)) {
@@ -345,13 +386,15 @@ public:
   // 设置TMC2209的COOLCONF寄存器（散热配置，n=16）
   // 参数说明：
   void set_coolconf(uint8_t seimin, uint8_t sedn, uint8_t semax, uint8_t seup,
-                    uint8_t semin, std::chrono::milliseconds delay_ms = default_timeout) {
+                    uint8_t semin,
+                    std::chrono::milliseconds delay_ms = default_timeout) {
     uint32_t coolconf_value = ((static_cast<uint32_t>(seimin) & 0x1) << 15) |
                               ((static_cast<uint32_t>(sedn) & 0x3) << 13) |
                               ((static_cast<uint32_t>(semax) & 0xF) << 8) |
                               ((static_cast<uint32_t>(seup) & 0x3) << 5) |
                               (static_cast<uint32_t>(semin) & 0xF);
-    write_register(tmc2209_register::COOLCONF_REG_ADDR, coolconf_value, delay_ms);
+    write_register(tmc2209_register::COOLCONF_REG_ADDR, coolconf_value,
+                   delay_ms);
   }
 
   void init() { set_tcoolthrs(10000); }

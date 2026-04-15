@@ -250,9 +250,9 @@ public:
   using dma_tx_cplt_callback_t = gdut::function<void()>;
   using dma_error_callback_t = gdut::function<void()>;
 
-  uart(UART_HandleTypeDef *huart, DMA_HandleTypeDef *hdma_rx = nullptr,
+  uart(UART_HandleTypeDef *huart, bool use_half_duplex = false, DMA_HandleTypeDef *hdma_rx = nullptr,
        DMA_HandleTypeDef *hdma_tx = nullptr)
-      : m_huart(huart), m_hdma_rx(nullptr), m_hdma_tx(nullptr) {
+      : m_huart(huart), m_hdma_rx(nullptr), m_hdma_tx(nullptr), m_use_half_duplex(use_half_duplex) {
     // init(hdma_rx, hdma_tx);
   }
 
@@ -567,16 +567,14 @@ protected:
 
 private:
   [[nodiscard]] bool is_half_duplex_mode() const {
-    if (!m_huart || !m_huart->Instance) {
-      return false;
-    }
-    return (m_huart->Instance->CR3 & USART_CR3_HDSEL) != 0U;
+    return m_use_half_duplex;
   }
 
   UART_HandleTypeDef *m_huart{nullptr};  // UART句柄
   DMA_HandleTypeDef *m_hdma_rx{nullptr}; // 接收DMA句柄
   DMA_HandleTypeDef *m_hdma_tx{nullptr}; // 发送DMA句柄
   uart_callbacks m_callbacks{};          // 回调管理器
+  bool m_use_half_duplex{false};              // 是否使用半双工模式
 };
 
 /**

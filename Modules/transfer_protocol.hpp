@@ -85,7 +85,8 @@ public:
     if (*begin != ((header >> 8) & 0xFF) || *(begin + 1) != (header & 0xFF)) {
       return; // Invalid packet header
     }
-    if (static_cast<std::size_t>(std::distance(begin, end)) < header_size + tail_size) {
+    if (static_cast<std::size_t>(std::distance(begin, end)) <
+        header_size + tail_size) {
       return; // Not enough data for header and tail, wait for more data
     }
     uint16_t size = *(begin + 2) << 8 | *(begin + 3);
@@ -187,13 +188,13 @@ public:
     return m_data.data() + size();
   }
 
-  [[nodiscard]] uint16_t calculate_verification() const noexcept {
+  void calculate_verification() const noexcept {
     if (m_data.size() < header_size + tail_size) {
-      return 0;
+      return;
     }
     verify_algorithm_t va;
-    return va.calculate(m_data.begin(), m_data.end(),
-                        m_data.begin() + header_size - sizeof(uint16_t));
+    va.calculate(m_data.begin(), m_data.end(),
+                 m_data.begin() + header_size - sizeof(uint16_t));
   }
 
   [[nodiscard]] bool verify_verification() const noexcept {
