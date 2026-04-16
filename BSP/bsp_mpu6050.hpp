@@ -395,7 +395,7 @@ public:
     data.gyro.z = be16_to_i16(buffer[12], buffer[13]);
 
     // 转换为物理单位 (使用动态量程转换因子)
-    float accel_lsb = get_accel_lsb_per_g();
+    const float accel_lsb = get_accel_lsb_per_g();
     float ax_g = data.accel.x / accel_lsb;
     float ay_g = data.accel.y / accel_lsb;
     float az_g = data.accel.z / accel_lsb;
@@ -403,7 +403,8 @@ public:
     // 计算欧拉角
     data.roll = std::atan2(ay_g, az_g);
     data.pitch = std::atan2(-ax_g, std::sqrt(ay_g * ay_g + az_g * az_g));
-    data.yaw = m_prev_yaw;
+    // 偏航角通过陀螺仪积分得到，单位转换为弧度
+    data.yaw = data.gyro.z / get_gyro_lsb_per_dps() * (std::numbers::pi_v<float> / 180.0f);
 
     // 计算真实加速度 (去掉重力): a_real = a_accel - a_gravity
     const float g = 9.81f; // 重力加速度
