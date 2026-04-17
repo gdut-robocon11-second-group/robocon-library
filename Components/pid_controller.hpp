@@ -116,6 +116,9 @@ public:
 
   // error = target - current
   [[nodiscard]] T update(T error, T dt) {
+    if (std::abs(dt) < static_cast<T>(1e-6)) {
+      dt = static_cast<T>(1e-6);
+    }
     if (DeadZone > T{} && std::abs(error) < DeadZone) {
       m_prev_error = error; // Reset previous error to prevent derivative kick
       return m_output;      // No change in output if within dead zone
