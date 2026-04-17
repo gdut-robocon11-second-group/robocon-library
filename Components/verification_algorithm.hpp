@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_VERIFICATION_ALGORITHM_HPP
 #define COMPONENTS_VERIFICATION_ALGORITHM_HPP
 
+#include <array>
 #include <cstdint>
 
 namespace gdut {
@@ -10,13 +11,18 @@ public:
   verify_algorithm() = default;
   ~verify_algorithm() = default;
 
-  template <typename It>
-  uint16_t calculate(It begin, It end, It code_loc) noexcept {
-    return static_cast<Derived *>(this)->calculate_code_impl(begin, end,
-                                                             code_loc);
+  template <typename ConstIt, typename It>
+  void calculate(ConstIt begin, ConstIt end, It code_loc) noexcept {
+    static_assert(sizeof(*begin) == 1,
+                  "The data size of the iterator must be 1");
+    static_assert(sizeof(*code_loc) == 1,
+                  "The data size of the code location must be 1");
+    static_cast<Derived *>(this)->calculate_code_impl(begin, end, code_loc);
   }
 
   template <typename It> bool verify(It begin, It end, It code_loc) noexcept {
+    static_assert(sizeof(*begin) == 1,
+                  "The data size of the iterator must be 1");
     return static_cast<Derived *>(this)->verify_code_impl(begin, end, code_loc);
   }
 };
@@ -25,10 +31,10 @@ class checksum_algorithm : public verify_algorithm<checksum_algorithm> {
 protected:
   friend verify_algorithm<checksum_algorithm>;
 
-  template <typename It>
-  uint16_t calculate_code_impl(It begin, It end, It code_loc) noexcept {
+  template <typename ConstIt, typename It>
+  void calculate_code_impl(ConstIt begin, ConstIt end, It code_loc) noexcept {
     uint32_t sum = 0;
-    It body_iter = begin;
+    ConstIt body_iter = begin;
     while (body_iter != end) {
       if (body_iter == code_loc) {
         if (body_iter + 1 == end) {
@@ -45,7 +51,13 @@ protected:
     while (sum >> 16) {
       sum = (sum >> 16) + (sum & 0xFFFF);
     }
-    return static_cast<uint16_t>(~sum);
+    uint16_t res = static_cast<uint16_t>(~sum);
+    if (code_loc != end) {
+      *code_loc = res >> 8;
+    }
+    if (code_loc + 1 != end) {
+      *(code_loc + 1) = res & 0xFF;
+    }
   }
 
   template <typename It>
@@ -66,16 +78,74 @@ protected:
   }
 };
 
+class crc8_algorithm : public verify_algorithm<crc8_algorithm> {
+protected:
+  friend verify_algorithm<crc8_algorithm>;
+
+  template <typename ConstIt, typename It>
+  void calculate_code_impl(ConstIt begin, ConstIt end, It code_loc) noexcept {
+    It crc = code_loc; // CRC located in last byte of message
+    uint8_t currentByte;
+    *crc = 0;
+    for (auto i = begin; i != end; i++) { // Execute for all bytes of a message
+      if (i == crc) {
+        continue;
+      }
+      currentByte = *i; // Retrieve a byte to be sent from Array
+      for (int j = 0; j < 8; j++) {
+        if ((*crc >> 7) ^
+            (currentByte & 0x01)) // update CRC based result of XOR operation
+        {
+          *crc = (*crc << 1) ^ 0x07;
+        } else {
+          *crc = (*crc << 1);
+        }
+        currentByte = currentByte >> 1;
+      } // for CRC bit
+    } // for message byte
+  }
+
+  template <typename It>
+  bool verify_code_impl(It begin, It end, It code_loc) noexcept {
+    uint8_t crc_val = 0;
+    uint8_t* crc = &crc_val; // CRC located in last byte of message
+    uint8_t currentByte;
+    *crc = 0;
+    for (auto i = begin; i != end; i++) { // Execute for all bytes of a message
+      if (i == crc) {
+        continue;
+      }
+      currentByte = *i; // Retrieve a byte to be sent from Array
+      for (int j = 0; j < 8; j++) {
+        if ((*crc >> 7) ^
+            (currentByte & 0x01)) // update CRC based result of XOR operation
+        {
+          *crc = (*crc << 1) ^ 0x07;
+        } else {
+          *crc = (*crc << 1);
+        }
+        currentByte = currentByte >> 1;
+      } // for CRC bit
+    } // for message byte
+    return crc_val == *code_loc;
+  }
+};
+
 class crc16_algorithm : public verify_algorithm<crc16_algorithm> {
 protected:
   friend verify_algorithm<crc16_algorithm>;
 
-  template <typename It>
-  uint16_t calculate_code_impl(It begin, It end, It code_loc) noexcept {
+  template <typename ConstIt, typename It>
+  void calculate_code_impl(ConstIt begin, ConstIt end, It code_loc) noexcept {
     uint16_t crc = 0xFFFF;
     crc = calculate_code_impl_(begin, code_loc, crc);
     crc = calculate_code_impl_(code_loc + sizeof(uint16_t), end, crc);
-    return crc;
+    if (code_loc != end) {
+      *code_loc = crc >> 8;
+    }
+    if (code_loc + 1 != end) {
+      *(code_loc + 1) = crc & 0xFF;
+    }
   }
 
   template <typename It>
@@ -96,7 +166,7 @@ protected:
     return crc;
   }
 
-  static constexpr uint16_t crc16_table[256] = {
+  static constexpr std::array<uint16_t, 256> crc16_table = {
       0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241, 0xC601,
       0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440, 0xCC01, 0x0CC0,
       0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40, 0x0A00, 0xCAC1, 0xCB81,

@@ -188,6 +188,22 @@ public:
     }
     uint32_t get_counter() const { return __HAL_TIM_GET_COUNTER(m_htim); }
 
+    /**
+     * @brief 获取定时器所在总线的时钟频率（Hz）
+     * STM32F407: TIM1, TIM8, TIM9, TIM10, TIM11 在 APB2 (168MHz);
+     *            其他定时器在 APB1 (84MHz)
+     */
+    uint32_t get_apb_clock() const {
+      if (!m_htim)
+        return 0;
+      if (m_htim->Instance == TIM1 || m_htim->Instance == TIM8 ||
+          m_htim->Instance == TIM9 || m_htim->Instance == TIM10 ||
+          m_htim->Instance == TIM11) {
+        return 168000000U;  // APB2
+      }
+      return 84000000U;  // APB1 (default for TIM2-7, TIM12-14)
+    }
+
   private:
     TIM_HandleTypeDef *m_htim;
   };
