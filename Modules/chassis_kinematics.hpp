@@ -17,17 +17,14 @@ public:
 
   // 1.414213f == sqrt(2)
   static constexpr matrix<float, 4, 3> forward_kinematics_matrix{
-      1.414213f, -1.414213f, radius,
-      -1.414213f, -1.414213f, radius,
-      -1.414213f, 1.414213f, radius,
-      1.414213f, 1.414213f, radius};
+      1.414213f,  -1.414213f, radius, -1.414213f, -1.414213f, radius,
+      -1.414213f, 1.414213f,  radius, 1.414213f,  1.414213f,  radius};
 
   //  0.176776f == 1 / (4 * sqrt(2))
   static constexpr matrix<float, 3, 4> inverse_kinematics_matrix{
-      0.176776f, -0.176776f, -0.176776f, 0.176776f,
-      -0.176776f, -0.176776f, 0.176776f, 0.176776f,
-      0.25f / radius, 0.25f / radius, 0.25f / radius, 0.25f / radius
-    };
+      0.176776f,      -0.176776f,     -0.176776f,     0.176776f,
+      -0.176776f,     -0.176776f,     0.176776f,      0.176776f,
+      0.25f / radius, 0.25f / radius, 0.25f / radius, 0.25f / radius};
 
   /*
    * @brief 计算机器人速度到轮速的转换
