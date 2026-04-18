@@ -112,17 +112,19 @@ public:
       dt = static_cast<T>(1e-6);
     }
     if (DeadZone > T{}) {
+      const T error_abs_delta = std::abs(error - m_prev_error);
+      const T error_dead_zone = DeadZone * dt;
       // 停车模式：只有目标和当前都足够接近 0 时,
       // 同时也满足导数条件，才直接归零； 如果目标已是 0 但电机还在动，则继续让
       // PID 刹到接近 0。
       if (std::abs(m_target) < DeadZone && std::abs(current) < DeadZone &&
-          std::abs((error - m_prev_error) / dt) < DeadZone) {
+          error_abs_delta < error_dead_zone) {
         m_prev_error = T{};
         m_integral = T{};
-        return m_output = T{};
+        return m_output = std::clamp(T{}, MinOutput, MaxOutput);
       }
       if (std::abs(m_target) >= DeadZone && std::abs(error) < DeadZone &&
-          std::abs((error - m_prev_error) / dt) < DeadZone) {
+          error_abs_delta < error_dead_zone) {
         // 非零目标时，死区内保持最后一次有效输出，避免来回抖动
         m_prev_error = error;
         return m_output = std::clamp(m_output, MinOutput, MaxOutput);
@@ -161,10 +163,10 @@ private:
   T m_output{};
 };
 
-template <
-    typename T, T Kp, T Ki, T Kd, T DeadZone = T{}, T IntegralWindupLimit = T{},
-    T MinOutput = std::numeric_limits<T>::lowest(),
-    T MaxOutput = std::numeric_limits<T>::max(), T Alpha = static_cast<T>(0.1)>
+template <typename T, T Kp, T Ki, T Kd, T DeadZone = T{},
+          T IntegralWindupLimit = T{},
+          T MinOutput = std::numeric_limits<T>::lowest(),
+          T MaxOutput = std::numeric_limits<T>::max()>
 pid_controller<T> make_pid_controller() {
   static_assert(Kp >= 0, "Proportional gain must be non-negative");
   static_assert(Ki >= 0, "Integral gain must be non-negative");
@@ -179,7 +181,7 @@ pid_controller<T> make_pid_controller() {
   static_assert(std::is_floating_point_v<T>,
                 "Template parameter T must be a floating-point type");
   return pid_controller<T>{
-      Kp, Ki, Kd, DeadZone, IntegralWindupLimit, MinOutput, MaxOutput, Alpha};
+      Kp, Ki, Kd, DeadZone, IntegralWindupLimit, MinOutput, MaxOutput};
 }
 
 } // namespace gdut
