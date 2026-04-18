@@ -78,15 +78,23 @@ public:
 
     // 读取编码器计数值
     gdut::timer::timer_proxy encoder_proxy(encoder_timer_);
-    const uint32_t previous_encoder_count = current_encoder_count_;
+    const uint32_t previous_encoder_count =
+        current_encoder_count_.load(std::memory_order_acquire);
     uint32_t current_counter = encoder_proxy.get_counter();
-    const uint32_t counter_width = encoder_proxy.get_arr() + 1U;
-    if (current_counter <= previous_encoder_count) {
-      // 处理计数器回绕（向下计数时）
-      current_counter += counter_width;
-    }
+    const uint64_t counter_width =
+        static_cast<uint64_t>(encoder_proxy.get_arr()) + 1ULL;
+    const int64_t half_range = static_cast<int64_t>(counter_width / 2ULL);
     int64_t delta_count = static_cast<int64_t>(current_counter) -
                           static_cast<int64_t>(previous_encoder_count);
+
+    // 该解包方法要求：单个控制周期内编码器增量绝对值小于计数器范围的一半
+    if (delta_count > half_range) {
+      // 发生了向下溢出
+      delta_count -= static_cast<int64_t>(counter_width);
+    } else if (delta_count < -half_range) {
+      // 发生了向上溢出
+      delta_count += static_cast<int64_t>(counter_width);
+    }
 
     current_encoder_count_.store(current_counter, std::memory_order_release);
 
@@ -133,8 +141,11 @@ protected:
     if (!encoder_timer_)
       return;
     gdut::timer::timer_encoder encoder(encoder_timer_);
-    current_encoder_count_ = encoder.encoder_start(TIM_CHANNEL_1);
-    total_revolutions_ = static_cast<float>(current_encoder_count_) / ppr_;
+    (void)encoder.encoder_start(TIM_CHANNEL_ALL);
+    gdut::timer::timer_proxy proxy(encoder_timer_);
+    current_encoder_count_.store(proxy.get_counter(), std::memory_order_release);
+    total_revolutions_.store(0.0f, std::memory_order_release);
+    current_speed_.store(0.0f, std::memory_order_release);
   }
 
 private:

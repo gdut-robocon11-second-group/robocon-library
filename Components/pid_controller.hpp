@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <memory>
 #include <type_traits>
 
 namespace gdut {
@@ -24,8 +23,7 @@ public:
   pid_controller(T Kp, T Ki, T Kd, T DeadZone = T{},
                  T IntegralWindupLimit = T{},
                  T MinOutput = std::numeric_limits<T>::lowest(),
-                 T MaxOutput = std::numeric_limits<T>::max(),
-                 T Alpha = static_cast<T>(0.1)) {
+                 T MaxOutput = std::numeric_limits<T>::max()) {
     (void)set_parameters(Kp, Ki, Kd, DeadZone, IntegralWindupLimit, MinOutput,
                          MaxOutput);
   }
@@ -80,14 +78,6 @@ public:
     return true;
   }
 
-  [[nodiscard]] bool set_alpha(T Alpha) {
-    if (Alpha < T{} || Alpha > static_cast<T>(1)) {
-      return false; // Alpha must be in the range [0, 1]
-    }
-    this->Alpha = Alpha;
-    return true;
-  }
-
   void set_integral(T integral) {
     if (IntegralWindupLimit > T{}) {
       m_integral =
@@ -101,8 +91,7 @@ public:
   set_parameters(T Kp, T Ki, T Kd, T DeadZone = T{},
                  T IntegralWindupLimit = T{},
                  T MinOutput = std::numeric_limits<T>::lowest(),
-                 T MaxOutput = std::numeric_limits<T>::max(),
-                 T Alpha = static_cast<T>(0.1)) {
+                 T MaxOutput = std::numeric_limits<T>::max()) {
     bool result = true;
     result = result && set_Kp(Kp);
     result = result && set_Ki(Ki);
@@ -110,18 +99,34 @@ public:
     result = result && set_dead_zone(DeadZone);
     result = result && set_integral_windup_limit(IntegralWindupLimit);
     result = result && set_output_limits(MinOutput, MaxOutput);
-    result = result && set_alpha(Alpha);
     return result;
   }
 
-  // error = target - current
-  [[nodiscard]] T update(T error, T dt) {
+  void set_target(T target) { this->m_target = target; }
+
+  [[nodiscard]] T get_target() const { return m_target; }
+
+  [[nodiscard]] T update(T current, T dt) {
+    T error = m_target - current;
     if (std::abs(dt) < static_cast<T>(1e-6)) {
       dt = static_cast<T>(1e-6);
     }
-    if (DeadZone > T{} && std::abs(error) < DeadZone) {
-      m_prev_error = error; // Reset previous error to prevent derivative kick
-      return m_output;      // No change in output if within dead zone
+    if (DeadZone > T{}) {
+      // 停车模式：只有目标和当前都足够接近 0 时,
+      // 同时也满足导数条件，才直接归零； 如果目标已是 0 但电机还在动，则继续让
+      // PID 刹到接近 0。
+      if (std::abs(m_target) < DeadZone && std::abs(current) < DeadZone &&
+          std::abs((error - m_prev_error) / dt) < DeadZone) {
+        m_prev_error = T{};
+        m_integral = T{};
+        return m_output = T{};
+      }
+      if (std::abs(m_target) >= DeadZone && std::abs(error) < DeadZone &&
+          std::abs((error - m_prev_error) / dt) < DeadZone) {
+        // 非零目标时，死区内保持最后一次有效输出，避免来回抖动
+        m_prev_error = error;
+        return m_output = std::clamp(m_output, MinOutput, MaxOutput);
+      }
     }
     if (IntegralWindupLimit > T{}) {
       m_integral = std::clamp(m_integral + error * dt, -IntegralWindupLimit,
@@ -130,19 +135,15 @@ public:
       m_integral += error * dt;
     }
     T derivative = (error - m_prev_error) / dt;
-    // 滤波处理：使用指数移动平均滤波器来平滑导数项
-    m_deriv_filter = Alpha * derivative + (1 - Alpha) * m_deriv_filter;
     m_prev_error = error;
-    return m_output =
-               std::clamp(Kp * error + Ki * m_integral + Kd * m_deriv_filter,
-                          MinOutput, MaxOutput);
+    return m_output = std::clamp(Kp * error + Ki * m_integral + Kd * derivative,
+                                 MinOutput, MaxOutput);
   }
 
   void reset() {
     m_integral = T{};
     m_prev_error = T{};
     m_output = T{};
-    m_deriv_filter = T{};
   }
 
 private:
@@ -153,12 +154,11 @@ private:
   T IntegralWindupLimit{};
   T MinOutput = std::numeric_limits<T>::lowest();
   T MaxOutput = std::numeric_limits<T>::max();
-  T Alpha{}; // 滤波系数
 
+  T m_target{};
   T m_integral{};
   T m_prev_error{};
   T m_output{};
-  T m_deriv_filter{}; // 用于滤波的变量
 };
 
 template <
