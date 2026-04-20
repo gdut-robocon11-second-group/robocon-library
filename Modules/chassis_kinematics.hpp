@@ -14,17 +14,19 @@ public:
   static_assert(Radius > 0, "Radius must be greater than 0");
 
   static constexpr float radius = Radius;
+  static constexpr float sqrt2 = std::numbers::sqrt2_v<float>;
+  static constexpr float inv_4times_sqrt2 = 1.0f / (4.0f * sqrt2);
 
   // 1.414213f == sqrt(2)
   static constexpr matrix<float, 4, 3> forward_kinematics_matrix{
-      1.414213f,  -1.414213f, radius, -1.414213f, -1.414213f, radius,
-      -1.414213f, 1.414213f,  radius, 1.414213f,  1.414213f,  radius};
+      sqrt2,  -sqrt2, radius, -sqrt2, -sqrt2, radius,
+      -sqrt2, sqrt2,  radius, sqrt2,  sqrt2,  radius};
 
   //  0.176776f == 1 / (4 * sqrt(2))
   static constexpr matrix<float, 3, 4> inverse_kinematics_matrix{
-      0.176776f,      -0.176776f,     -0.176776f,     0.176776f,
-      -0.176776f,     -0.176776f,     0.176776f,      0.176776f,
-      0.25f / radius, 0.25f / radius, 0.25f / radius, 0.25f / radius};
+      inv_4times_sqrt2,  -inv_4times_sqrt2, -inv_4times_sqrt2, inv_4times_sqrt2,
+      -inv_4times_sqrt2, -inv_4times_sqrt2, inv_4times_sqrt2,  inv_4times_sqrt2,
+      0.25f / radius,    0.25f / radius,    0.25f / radius,    0.25f / radius};
 
   /*
    * @brief 计算机器人速度到轮速的转换
