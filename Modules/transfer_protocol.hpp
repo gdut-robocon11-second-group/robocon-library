@@ -70,9 +70,7 @@ public:
     std::copy(begin, end, m_data.begin() + header_size);
     m_data[total_size - 2] = (tail >> 8) & 0xFF;
     m_data[total_size - 1] = tail & 0xFF;
-    uint16_t crc = calculate_verification();
-    m_data[6] = (crc >> 8) & 0xFF;
-    m_data[7] = crc & 0xFF;
+    update_verification();
   }
 
   template <std::random_access_iterator It>
@@ -188,7 +186,7 @@ public:
     return m_data.data() + size();
   }
 
-  void calculate_verification() const noexcept {
+  void update_verification() noexcept {
     if (m_data.size() < header_size + tail_size) {
       return;
     }
