@@ -123,7 +123,7 @@ void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
   // 某些 2.4G 接收器在按键全松开时会回传原始字节 0xFF 0xFF，
   // 这与正常协议语义不一致，因此在取反前直接把它当成“无按键按下”处理。
   if (rx[3] == 0xFF && rx[4] == 0xFF) {
-    new_state.buttons = 0;
+    new_state.buttons = 0;
   } else {
     new_state.buttons =
         static_cast<uint16_t>(static_cast<uint8_t>(~rx[3])) |
