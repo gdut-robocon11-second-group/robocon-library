@@ -76,7 +76,7 @@ public:
   }
 
   template <typename Func, typename... Args>
-  thread(Func &&func, Args &&...args) {
+  thread(const char *thread_name, Func &&func, Args &&...args) {
     static_assert(
         std::is_invocable_v<Func, Args...>,
         "gdut::thread constructor requires a callable that can be invoked "
@@ -113,7 +113,7 @@ public:
     }
     allocator.template construct<bound_type>(data, std::move(bound));
     osThreadAttr_t attributes = {
-        .name = "gdut_thread", .stack_size = StackSize, .priority = Priority};
+        .name = thread_name, .stack_size = StackSize, .priority = Priority};
     m_handle =
         std::unique_ptr<std::remove_pointer_t<osThreadId_t>, thread_deleter>{
             osThreadNew(

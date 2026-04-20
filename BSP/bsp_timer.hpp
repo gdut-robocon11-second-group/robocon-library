@@ -18,6 +18,8 @@ class timer : private uncopyable {
 public:
   using callback_t = gdut::function<void()>;
 
+  timer() : m_htim(nullptr), m_hdma(nullptr) {}
+
   // 构造函数
   timer(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma = nullptr)
       : m_htim(htim), m_hdma(nullptr) {
@@ -199,9 +201,9 @@ public:
       if (m_htim->Instance == TIM1 || m_htim->Instance == TIM8 ||
           m_htim->Instance == TIM9 || m_htim->Instance == TIM10 ||
           m_htim->Instance == TIM11) {
-        return 168000000U;  // APB2
+        return 168000000U; // APB2
       }
-      return 84000000U;  // APB1 (default for TIM2-7, TIM12-14)
+      return 84000000U; // APB1 (default for TIM2-7, TIM12-14)
     }
 
   private:

@@ -15,6 +15,8 @@ class motor : private gdut::uncopyable {
   static_assert(std::atomic<float>::is_always_lock_free);
 
 public:
+  motor() = default;
+
   // pwm_timer:用于 PWM 输出的timer对象指针
   // pwm_channel_A:正转通道
   // direction_gpio_port:用于控制电机转向的 GPIO 端口
@@ -51,6 +53,29 @@ public:
         current_speed_(other.current_speed_.load(std::memory_order_acquire)) {
     other.pwm_timer_ = nullptr;
     other.encoder_timer_ = nullptr;
+  }
+
+  motor &operator=(motor &&other) noexcept {
+    if (this != std::addressof(other)) {
+      pwm_timer_ = other.pwm_timer_;
+      encoder_timer_ = other.encoder_timer_;
+      pwm_channel_A_ = other.pwm_channel_A_;
+      direction_gpio_port_ = other.direction_gpio_port_;
+      direction_gpio_pin_ = other.direction_gpio_pin_;
+      ppr_ = other.ppr_;
+      current_encoder_count_.store(
+          other.current_encoder_count_.load(std::memory_order_acquire),
+          std::memory_order_release);
+      total_revolutions_.store(
+          other.total_revolutions_.load(std::memory_order_acquire),
+          std::memory_order_release);
+      current_speed_.store(other.current_speed_.load(std::memory_order_acquire),
+                           std::memory_order_release);
+
+      other.pwm_timer_ = nullptr;
+      other.encoder_timer_ = nullptr;
+    }
+    return *this;
   }
 
   // ----- 获取状态 -----

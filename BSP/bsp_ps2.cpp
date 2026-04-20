@@ -123,6 +123,10 @@ void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
   new_state.buttons =
       static_cast<uint16_t>(static_cast<uint8_t>(~rx[3])) |
       (static_cast<uint16_t>(static_cast<uint8_t>(~rx[4])) << 8);
+  if (new_state.buttons == 65535U) {
+    // 按键全松开时某些 2.4G 接收器会回传 0xFF 0xFF，但这时其实是等同于没有按键被按下的，因此把它当成0处理。
+    new_state.buttons = 0;
+  }
 
   // rx[5..6] 为右摇杆，rx[7..8] 为左摇杆。
   new_state.right_x = rx[5];
