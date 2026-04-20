@@ -15,7 +15,11 @@ class motor : private gdut::uncopyable {
   static_assert(std::atomic<float>::is_always_lock_free);
 
 public:
-  motor() = default;
+  motor()
+      : pwm_timer_(nullptr), encoder_timer_(nullptr), pwm_channel_A_(0),
+        direction_gpio_port_(nullptr), direction_gpio_pin_(0), ppr_(1.0f),
+        current_encoder_count_(0), total_revolutions_(0.0f),
+        current_speed_(0.0f) {}
 
   // pwm_timer:用于 PWM 输出的timer对象指针
   // pwm_channel_A:正转通道

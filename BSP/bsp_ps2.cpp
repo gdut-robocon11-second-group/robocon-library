@@ -120,12 +120,14 @@ void ps2_controller::parse_state(std::span<const uint8_t, 9> rx) {
   ps2_state new_state{};
 
   // PS2 按键位是低有效：0=按下，1=松开，因此需按位取反后再组合。
-  new_state.buttons =
-      static_cast<uint16_t>(static_cast<uint8_t>(~rx[3])) |
-      (static_cast<uint16_t>(static_cast<uint8_t>(~rx[4])) << 8);
-  if (new_state.buttons == 65535U) {
-    // 按键全松开时某些 2.4G 接收器会回传 0xFF 0xFF，但这时其实是等同于没有按键被按下的，因此把它当成0处理。
-    new_state.buttons = 0;
+  // 某些 2.4G 接收器在按键全松开时会回传原始字节 0xFF 0xFF，
+  // 这与正常协议语义不一致，因此在取反前直接把它当成“无按键按下”处理。
+  if (rx[3] == 0xFF && rx[4] == 0xFF) {
+    new_state.buttons = 0;
+  } else {
+    new_state.buttons =
+        static_cast<uint16_t>(static_cast<uint8_t>(~rx[3])) |
+        (static_cast<uint16_t>(static_cast<uint8_t>(~rx[4])) << 8);
   }
 
   // rx[5..6] 为右摇杆，rx[7..8] 为左摇杆。
