@@ -198,6 +198,15 @@ public:
       function<void(float roll, float pitch, float yaw)> callback) {
     m_callbacks.euler_callback = std::move(callback);
   }
+  void set_quaternion_callback(
+      function<void(float q0, float q1, float q2, float q3)> callback) {
+    m_callbacks.quaternion_callback = std::move(callback);
+  }
+  void set_gyro_and_acc_callback(
+      function<void(float gyro_x, float gyro_y, float gyro_z, float acc_x,
+                    float acc_y, float acc_z)> callback) {
+    m_callbacks.gyro_and_acc_callback = std::move(callback);
+  }
 
   void handle_uart_rx(uint16_t size) {
     if (!m_message_queue) {
@@ -221,8 +230,10 @@ public:
       iter += chunk_size;
       size -= chunk_size;
     }
-    HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
-                                 m_rx_buffer.size());
+    if (m_uart) {
+      HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
+                                   m_rx_buffer.size());
+    }
   }
 
   void handle_error_rx() {
