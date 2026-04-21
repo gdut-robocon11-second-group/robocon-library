@@ -255,28 +255,30 @@ public:
         });
     HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
                                  m_rx_buffer.size());
-    atk_ms901m_retrunset_data retrunset_data;
-    retrunset_data.set_euler(true);
-    retrunset_data.set_quaternion(false);
-    retrunset_data.set_gyro_and_acc(true);
-    retrunset_data.set_mag_and_temp(false);
-    retrunset_data.set_atmos_and_temp(false);
-    retrunset_data.set_port_status(false);
-    retrunset_data.set_upload_data(false);
 
-    // 复位
     {
+      // 复位
       uint8_t empty{0};
       send_frame<1, false, atk_ms901m_reg::RESET>(
           std::span<const uint8_t, 1>{&empty, &empty + 1});
     }
 
     // 设置主动上报内容为欧拉角和陀螺仪加速度数据
-    send_frame<sizeof(retrunset_data), false, atk_ms901m_reg::RETURNSET>(
-        std::span<const uint8_t, sizeof(retrunset_data)>{
-            reinterpret_cast<const uint8_t *>(&retrunset_data),
-            reinterpret_cast<const uint8_t *>(&retrunset_data) +
-                sizeof(retrunset_data)});
+    {
+      atk_ms901m_retrunset_data retrunset_data;
+      retrunset_data.set_euler(true);
+      retrunset_data.set_quaternion(false);
+      retrunset_data.set_gyro_and_acc(true);
+      retrunset_data.set_mag_and_temp(false);
+      retrunset_data.set_atmos_and_temp(false);
+      retrunset_data.set_port_status(false);
+      retrunset_data.set_upload_data(false);
+      send_frame<sizeof(retrunset_data), false, atk_ms901m_reg::RETURNSET>(
+          std::span<const uint8_t, sizeof(retrunset_data)>{
+              reinterpret_cast<const uint8_t *>(&retrunset_data),
+              reinterpret_cast<const uint8_t *>(&retrunset_data) +
+                  sizeof(retrunset_data)});
+    }
 
     // 设置陀螺仪满量程为 2000 dps
     send_frame<1, false, atk_ms901m_reg::GYROFSR>(std::span<const uint8_t, 1>{
@@ -287,6 +289,13 @@ public:
     send_frame<1, false, atk_ms901m_reg::ACCFSR>(std::span<const uint8_t, 1>{
         reinterpret_cast<const uint8_t *>(&m_acc_fsr),
         reinterpret_cast<const uint8_t *>(&m_acc_fsr) + 1});
+
+    // 使用九轴融合算法
+    {
+      std::uint8_t alg = 0x01; // 0x00: 六轴融合，0x01: 九轴融合
+      send_frame<1, false, atk_ms901m_reg::ALG>(std::span<const uint8_t, 1>{
+        reinterpret_cast<const uint8_t *>(&alg), reinterpret_cast<const uint8_t *>(&alg) + 1});
+    }
   }
 
   std::size_t get_gyro_fsr() const {
