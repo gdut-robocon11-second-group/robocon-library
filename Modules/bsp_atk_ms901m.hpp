@@ -400,7 +400,7 @@ protected:
     if (is_ret) {
       switch (static_cast<atk_ms901m_return_id>(id)) {
       case atk_ms901m_return_id::EULER:
-        parse_eular(data, length);
+        parse_euler(data, length);
         break;
       case atk_ms901m_return_id::QUATERNION:
         parse_quaternion(data, length);
@@ -420,7 +420,7 @@ protected:
     }
   }
 
-  void parse_eular(const uint8_t *data, uint8_t length) {
+  void parse_euler(const uint8_t *data, uint8_t length) {
     // 解析欧拉角数据
     if (!m_callbacks.euler_callback) {
       return;
