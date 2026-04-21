@@ -8,6 +8,7 @@
 #include "stm32f4xx_hal_uart.h"
 #include "thread.hpp"
 #include "uncopyable.hpp"
+#include <algorithm>
 #include <array>
 #include <span>
 #include <vector>
@@ -86,14 +87,108 @@ struct atk_ms901m_response_header {
 } __attribute__((packed));
 
 struct atk_ms901m_retrunset_data {
-  bool set_euler : 1;
-  bool set_quaternion : 1;
-  bool set_gyro_and_acc : 1;
-  bool set_mag_and_temp : 1;
-  bool set_atmos_and_temp : 1;
-  bool set_port_status : 1;
-  bool set_upload_data : 1;
-  bool empty : 1;
+  static constexpr std::uint8_t SET_EULER_BIT = 1u << 0;
+  static constexpr std::uint8_t SET_QUATERNION_BIT = 1u << 1;
+  static constexpr std::uint8_t SET_GYRO_AND_ACC_BIT = 1u << 2;
+  static constexpr std::uint8_t SET_MAG_AND_TEMP_BIT = 1u << 3;
+  static constexpr std::uint8_t SET_ATMOS_AND_TEMP_BIT = 1u << 4;
+  static constexpr std::uint8_t SET_PORT_STATUS_BIT = 1u << 5;
+  static constexpr std::uint8_t SET_UPLOAD_DATA_BIT = 1u << 6;
+  static constexpr std::uint8_t EMPTY_BIT = 1u << 7;
+
+  std::uint8_t flags = 0;
+
+  void set_euler(bool enabled) {
+    if (enabled) {
+      flags |= SET_EULER_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_EULER_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_euler() const { return (flags & SET_EULER_BIT) != 0; }
+
+  void set_quaternion(bool enabled) {
+    if (enabled) {
+      flags |= SET_QUATERNION_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_QUATERNION_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_quaternion() const {
+    return (flags & SET_QUATERNION_BIT) != 0;
+  }
+
+  void set_gyro_and_acc(bool enabled) {
+    if (enabled) {
+      flags |= SET_GYRO_AND_ACC_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_GYRO_AND_ACC_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_gyro_and_acc() const {
+    return (flags & SET_GYRO_AND_ACC_BIT) != 0;
+  }
+
+  void set_mag_and_temp(bool enabled) {
+    if (enabled) {
+      flags |= SET_MAG_AND_TEMP_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_MAG_AND_TEMP_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_mag_and_temp() const {
+    return (flags & SET_MAG_AND_TEMP_BIT) != 0;
+  }
+
+  void set_atmos_and_temp(bool enabled) {
+    if (enabled) {
+      flags |= SET_ATMOS_AND_TEMP_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_ATMOS_AND_TEMP_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_atmos_and_temp() const {
+    return (flags & SET_ATMOS_AND_TEMP_BIT) != 0;
+  }
+
+  void set_port_status(bool enabled) {
+    if (enabled) {
+      flags |= SET_PORT_STATUS_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_PORT_STATUS_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_port_status() const {
+    return (flags & SET_PORT_STATUS_BIT) != 0;
+  }
+
+  void set_upload_data(bool enabled) {
+    if (enabled) {
+      flags |= SET_UPLOAD_DATA_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~SET_UPLOAD_DATA_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_upload_data() const {
+    return (flags & SET_UPLOAD_DATA_BIT) != 0;
+  }
+
+  void set_empty(bool enabled) {
+    if (enabled) {
+      flags |= EMPTY_BIT;
+    } else {
+      flags &= static_cast<std::uint8_t>(~EMPTY_BIT);
+    }
+  }
+
+  [[nodiscard]] bool get_empty() const { return (flags & EMPTY_BIT) != 0; }
 } __attribute__((packed));
 
 class atk_ms901m : private uncopyable {
@@ -101,20 +196,8 @@ public:
   atk_ms901m() = default;
   ~atk_ms901m() = default;
 
-  atk_ms901m(atk_ms901m &&other) noexcept
-      : m_uart(std::exchange(other.m_uart, nullptr)),
-        m_send_func(std::move(other.m_send_func)),
-        m_rx_buffer(std::move(other.m_rx_buffer)) {}
-
-  atk_ms901m &operator=(atk_ms901m &&other) noexcept {
-    if (this != std::addressof(other)) {
-      m_uart = std::exchange(other.m_uart, nullptr);
-      m_send_func = std::move(other.m_send_func);
-      m_rx_buffer = std::move(other.m_rx_buffer);
-    }
-    return *this;
-  }
-
+  atk_ms901m(atk_ms901m &&other) noexcept = delete;
+  atk_ms901m &operator=(atk_ms901m &&other) noexcept = delete;
   void set_uart(uart *uart) { m_uart = uart; }
   void
   set_send_func(function<void(const uint8_t *data, uint16_t size)> send_func) {
@@ -402,7 +485,7 @@ protected:
   }
 
 private:
-  uart *m_uart;
+  uart *m_uart{nullptr};
 
   atk_ms901m_gyro_fsr m_gyro_fsr{atk_ms901m_gyro_fsr::DPS500};
   atk_ms901m_acc_fsr m_acc_fsr{atk_ms901m_acc_fsr::G4};
