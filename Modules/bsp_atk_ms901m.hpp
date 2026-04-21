@@ -1,7 +1,6 @@
 #ifndef BSP_ATK_MS901M_HPP
 #define BSP_ATK_MS901M_HPP
 
-#include "bsp_uart.hpp"
 #include "function.hpp"
 #include "memory_resource.hpp"
 #include "message_queue.hpp"
@@ -189,7 +188,7 @@ public:
 
   atk_ms901m(atk_ms901m &&other) noexcept = delete;
   atk_ms901m &operator=(atk_ms901m &&other) noexcept = delete;
-  void set_uart(uart *uart) { m_uart = uart; }
+  void set_uart(UART_HandleTypeDef *uart) { m_uart = uart; }
   void
   set_send_func(function<void(const uint8_t *data, uint16_t size)> send_func) {
     m_send_func = std::move(send_func);
@@ -204,14 +203,15 @@ public:
   }
   void set_gyro_and_acc_callback(
       function<void(float gyro_x, float gyro_y, float gyro_z, float acc_x,
-                    float acc_y, float acc_z)> callback) {
+                    float acc_y, float acc_z)>
+          callback) {
     m_callbacks.gyro_and_acc_callback = std::move(callback);
   }
 
   void handle_uart_rx(uint16_t size) {
     if (!m_message_queue) {
       if (m_uart) {
-        HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
+        HAL_UARTEx_ReceiveToIdle_DMA(m_uart, m_rx_buffer.data(),
                                      m_rx_buffer.size());
       }
       return;
@@ -231,14 +231,14 @@ public:
       size -= chunk_size;
     }
     if (m_uart) {
-      HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
+      HAL_UARTEx_ReceiveToIdle_DMA(m_uart, m_rx_buffer.data(),
                                    m_rx_buffer.size());
     }
   }
 
   void handle_error_rx() {
     if (m_uart) {
-      HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
+      HAL_UARTEx_ReceiveToIdle_DMA(m_uart, m_rx_buffer.data(),
                                    m_rx_buffer.size());
     }
   }
@@ -264,7 +264,7 @@ public:
             }
           }
         });
-    HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
+    HAL_UARTEx_ReceiveToIdle_DMA(m_uart, m_rx_buffer.data(),
                                  m_rx_buffer.size());
 
     {
@@ -500,7 +500,7 @@ protected:
   }
 
 private:
-  uart *m_uart{nullptr};
+  UART_HandleTypeDef *m_uart{nullptr};
 
   atk_ms901m_gyro_fsr m_gyro_fsr{atk_ms901m_gyro_fsr::DPS500};
   atk_ms901m_acc_fsr m_acc_fsr{atk_ms901m_acc_fsr::G4};
