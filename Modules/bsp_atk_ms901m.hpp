@@ -294,7 +294,8 @@ public:
     {
       std::uint8_t alg = 0x01; // 0x00: 六轴融合，0x01: 九轴融合
       send_frame<1, false, atk_ms901m_reg::ALG>(std::span<const uint8_t, 1>{
-        reinterpret_cast<const uint8_t *>(&alg), reinterpret_cast<const uint8_t *>(&alg) + 1});
+          reinterpret_cast<const uint8_t *>(&alg),
+          reinterpret_cast<const uint8_t *>(&alg) + 1});
     }
   }
 
