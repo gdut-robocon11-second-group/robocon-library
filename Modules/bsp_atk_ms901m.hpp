@@ -68,15 +68,6 @@ struct atk_ms901m_request_header {
   // uint8_t checksum;
 } __attribute__((packed));
 
-// ATK MS901M 主动上报帧头
-struct atk_ms901m_return_header {
-  uint8_t header[2] = {0x55, 0x55};
-  uint8_t id;
-  uint8_t length; // 数据长度
-  // uint8_t data[length];
-  // uint8_t checksum;
-} __attribute__((packed));
-
 // ATK MS901M 响应帧头
 struct atk_ms901m_response_header {
   uint8_t header[2] = {0x55, 0xAF};
@@ -264,15 +255,14 @@ public:
         });
     HAL_UARTEx_ReceiveToIdle_DMA(m_uart->get_huart(), m_rx_buffer.data(),
                                  m_rx_buffer.size());
-    atk_ms901m_retrunset_data retrunset_data{
-        .set_euler = true,
-        .set_quaternion = false,
-        .set_gyro_and_acc = true,
-        .set_mag_and_temp = false,
-        .set_atmos_and_temp = false,
-        .set_port_status = false,
-        .set_upload_data = false,
-    };
+    atk_ms901m_retrunset_data retrunset_data;
+    retrunset_data.set_euler(true);
+    retrunset_data.set_quaternion(false);
+    retrunset_data.set_gyro_and_acc(true);
+    retrunset_data.set_mag_and_temp(false);
+    retrunset_data.set_atmos_and_temp(false);
+    retrunset_data.set_port_status(false);
+    retrunset_data.set_upload_data(false);
 
     // 复位
     {
@@ -342,8 +332,11 @@ protected:
 
   void process_message() {
     while (m_message_buffer.size() >= sizeof(atk_ms901m_response_header)) {
-      auto *header = reinterpret_cast<const atk_ms901m_response_header *>(
-          m_message_buffer.data());
+      atk_ms901m_response_header response_header;
+      std::copy(m_message_buffer.begin(),
+                m_message_buffer.begin() + sizeof(response_header),
+                reinterpret_cast<uint8_t *>(&response_header));
+      atk_ms901m_response_header *header = &response_header;
       if (header->header[0] != 0x55 ||
           (header->header[1] != 0xAF && header->header[1] != 0x55)) {
         // 无效帧头，丢弃第一个字节
@@ -377,6 +370,7 @@ protected:
 
   template <std::size_t Length, bool Read, atk_ms901m_reg Reg>
   void send_frame(std::span<const uint8_t, Length> data) {
+    static_assert(Length <= 255, "Data length exceeds maximum allowed size");
     if (!m_send_func) {
       return;
     }
