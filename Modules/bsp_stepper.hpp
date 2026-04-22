@@ -25,6 +25,8 @@ namespace gdut {
  */
 class stepper_motor : private uncopyable {
 public:
+  stepper_motor() = default;
+
   /**
    * @param dir_pin       DIR 引脚
    * @param step_timer    已配置为PWM模式的 timer 对象
@@ -38,9 +40,24 @@ public:
         [this]() { handle_step_isr(); });
   }
 
+  stepper_motor(stepper_motor &&other) noexcept = delete;
+
+  stepper_motor &operator=(stepper_motor &&other) noexcept = delete;
+
   ~stepper_motor() {
     stop();
     m_step_timer->register_period_elapsed_callback(timer::callback_t{});
+  }
+
+  void set_parameters(gpio_proxy *dir_pin, timer *step_timer, uint32_t pwm_channel) {
+    m_dir_pin = dir_pin;
+    m_step_timer = step_timer;
+    m_pwm_channel = pwm_channel;
+
+    if (m_step_timer) {
+      m_step_timer->register_period_elapsed_callback(
+          [this]() { handle_step_isr(); });
+    }
   }
 
   void set_direction(bool clockwise) {
@@ -121,6 +138,9 @@ public:
 
   /** 立即停止运动 */
   void stop() {
+    if (!m_step_timer) {
+      return;
+    }
     auto *htim = m_step_timer->get_htim();
     if (htim) {
       timer::timer_pwm pwm_helper(m_step_timer);
@@ -145,9 +165,9 @@ private:
   }
 
 private:
-  gpio_proxy *m_dir_pin;
-  timer *m_step_timer;
-  uint32_t m_pwm_channel;
+  gpio_proxy *m_dir_pin{nullptr};
+  timer *m_step_timer{nullptr};
+  uint32_t m_pwm_channel{0};
 
   std::atomic<uint32_t> m_remaining_steps{0}; // 剩余步数，Update中断递减
 };
@@ -404,7 +424,7 @@ public:
   void init() { set_tcoolthrs(10000); }
 
 private:
-  gdut::uart *m_uart;
+  gdut::uart *m_uart{nullptr};
   uint8_t m_node_address; // TMC2209地址
 };
 
