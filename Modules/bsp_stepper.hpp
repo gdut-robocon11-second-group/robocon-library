@@ -25,6 +25,8 @@ namespace gdut {
  */
 class stepper_motor : private uncopyable {
 public:
+  stepper_motor() = default;
+
   /**
    * @param dir_pin       DIR 引脚
    * @param step_timer    已配置为PWM模式的 timer 对象
@@ -36,6 +38,32 @@ public:
 
     m_step_timer->register_period_elapsed_callback(
         [this]() { handle_step_isr(); });
+  }
+
+  stepper_motor(stepper_motor &&other) noexcept
+      : m_dir_pin(other.m_dir_pin), m_step_timer(other.m_step_timer),
+        m_pwm_channel(other.m_pwm_channel),
+        m_remaining_steps(other.m_remaining_steps.load()) {
+    other.m_dir_pin = nullptr;
+    other.m_step_timer = nullptr;
+    other.m_pwm_channel = 0;
+    other.m_remaining_steps = 0;
+  }
+
+  stepper_motor &operator=(stepper_motor &&other) noexcept {
+    if (this != std::addressof(other)) {
+      stop();
+      m_dir_pin = other.m_dir_pin;
+      m_step_timer = other.m_step_timer;
+      m_pwm_channel = other.m_pwm_channel;
+      m_remaining_steps = other.m_remaining_steps.load();
+
+      other.m_dir_pin = nullptr;
+      other.m_step_timer = nullptr;
+      other.m_pwm_channel = 0;
+      other.m_remaining_steps = 0;
+    }
+    return *this;
   }
 
   ~stepper_motor() {
@@ -121,6 +149,9 @@ public:
 
   /** 立即停止运动 */
   void stop() {
+    if (!m_step_timer) {
+      return;
+    }
     auto *htim = m_step_timer->get_htim();
     if (htim) {
       timer::timer_pwm pwm_helper(m_step_timer);

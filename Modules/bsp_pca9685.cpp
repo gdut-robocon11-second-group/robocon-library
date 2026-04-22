@@ -186,7 +186,7 @@ HAL_StatusTypeDef pca9685::set_pwm_freq(float freq_hz) {
   return HAL_OK;
 }
 
-HAL_StatusTypeDef pca9685::set_pwm(uint8_t channel, uint16_t on, uint16_t off) {
+HAL_StatusTypeDef pca9685::set_pwm_opened(uint8_t channel, uint16_t on, uint16_t off) {
   if (channel >= channel_count) {
     return HAL_ERROR;
   }
@@ -237,22 +237,22 @@ HAL_StatusTypeDef pca9685::set_duty(std::uint8_t channel, std::uint16_t duty,
 
   if (!invert) {
     if (duty == 0U) {
-      return set_pwm(channel, 0, 4096); // full off
+      return set_pwm_opened(channel, 0, 4096); // full off
     }
     if (duty >= 4095U) {
-      return set_pwm(channel, 4096, 0); // full on
+      return set_pwm_opened(channel, 4096, 0); // full on
     }
-    return set_pwm(channel, 0, duty);
+    return set_pwm_opened(channel, 0, duty);
   }
 
   // 反相模式
   if (duty == 0U) {
-    return set_pwm(channel, 4096, 0);
+    return set_pwm_opened(channel, 4096, 0);
   }
   if (duty >= 4095U) {
-    return set_pwm(channel, 0, 4096);
+    return set_pwm_opened(channel, 0, 4096);
   }
-  return set_pwm(channel, 0, static_cast<uint16_t>(4095U - duty));
+  return set_pwm_opened(channel, 0, static_cast<uint16_t>(4095U - duty));
 }
 
 HAL_StatusTypeDef pca9685::set_servo_pulse_us(uint8_t channel, float pulse_us) {
@@ -275,9 +275,10 @@ HAL_StatusTypeDef pca9685::set_servo_pulse_us(uint8_t channel, float pulse_us) {
   }
 
   const uint16_t ticks = static_cast<uint16_t>(ticks_f + 0.5f);
-  return set_pwm(channel, 0, ticks);
+  return set_pwm_opened(channel, 0, ticks);
 }
-// 度数接口
+// 度数接口,min_pulse_us 和 max_pulse_us 分别对应 0° 和 max_angle_deg° 的脉宽，线性插值
+//min_pulse_us,500us，最大的对应 2500us，但实际使用时可能需要微调以适配舵机的实际范围和性能
 HAL_StatusTypeDef pca9685::set_servo_angle(std::uint8_t channel,
                                            float angle_deg, float min_pulse_us,
                                            float max_pulse_us,

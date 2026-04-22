@@ -52,7 +52,9 @@ public:
    * 如 acquire() 和 release() 会返回 osError，不会调用
    * 下层 CMSIS-RTOS2 API。
    */
-  explicit counting_semaphore(osSemaphoreId_t semaphore_id) noexcept
+  template <typename T, typename = std::enable_if_t<
+                            std::same_as<std::decay_t<T>, osSemaphoreId_t>>>
+  explicit counting_semaphore(T semaphore_id) noexcept
       : m_semaphore_id(semaphore_id) {}
 
   ~counting_semaphore() noexcept {
