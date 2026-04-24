@@ -12,12 +12,14 @@ namespace gdut {
 
 class line_follower_8ch {
 public:
-//对控制方式的读写
+  // 对控制方式的读写
   enum class comm_mode : uint8_t {
-    i2c = 0,
-    gpio = 1,
+    null = 0,
+    i2c,
+    gpio,
   };
-//总共8个通道
+
+  // 总共8个通道
   static constexpr uint8_t channel_count = 8;
   // I2C 地址
   static constexpr uint8_t i2c_addr_7bit = 0x5D;
@@ -26,12 +28,12 @@ public:
       static_cast<uint16_t>(i2c_addr_7bit << 1);
 
   // 协议寄存器
-  //5寄存器是线检测结果寄存器
-  //6是通道一的灰度模拟值寄存器
+  // 5寄存器是线检测结果寄存器
+  // 6是通道一的灰度模拟值寄存器
   static constexpr uint8_t reg_line_result = 0x05;
   static constexpr uint8_t reg_gray_ch1 = 0x06;
   static constexpr uint8_t reg_threshold_ch1 = 0x16;
-  //gpio口
+  // gpio口
   struct gpio_pin {
     GPIO_TypeDef *port{nullptr};
     uint16_t pin{0};
@@ -40,7 +42,7 @@ public:
   using delay_us_callback_t = void (*)(uint32_t us);
 
   struct gpio_bus {
-    //三个选择器，一个输出
+    // 三个选择器，一个输出
     gpio_pin ad0{};
     gpio_pin ad1{};
     gpio_pin ad2{};
@@ -52,61 +54,89 @@ public:
     uint32_t settle_us{5};
   };
 
-  struct snapshot {
+  struct snapshot_gpio {
     // 统一语义：1 = 检测到目标线；0 = 未检测到目标线。
     std::array<uint8_t, channel_count> line{};
-    uint8_t line_mask{0};
+  };
 
-    // 仅 I2C 模式可读
+  struct snapshot_i2c {
+    // 统一语义：1 = 检测到目标线；0 = 未检测到目标线。
+    std::array<uint8_t, channel_count> line{};
     std::array<uint16_t, channel_count> gray{};
     std::array<uint16_t, channel_count> threshold{};
   };
-  //两种方式的构造函数
-  explicit line_follower_8ch(gdut::i2c &bus,
-                             uint16_t hal_addr = i2c_addr_hal);
+
+  line_follower_8ch() = default;
+  ~line_follower_8ch() = default;
+
+  // 设置参数，支持两种方式：I2C 或 GPIO
+  void set_parameters(gdut::i2c &bus, uint16_t hal_addr = i2c_addr_hal) {
+    m_mode = comm_mode::i2c;
+    m_i2c = &bus;
+    m_i2c_hal_addr = hal_addr;
+  }
+
+  void set_parameters(const gpio_bus &bus) {
+    m_mode = comm_mode::gpio;
+    m_i2c = nullptr;
+    m_gpio = bus;
+  }
+
+  // 两种方式的构造函数
+  explicit line_follower_8ch(gdut::i2c &bus, uint16_t hal_addr = i2c_addr_hal);
   explicit line_follower_8ch(const gpio_bus &bus);
-//模式的识别
+  // 模式的识别
   comm_mode mode() const { return m_mode; }
   bool is_i2c_mode() const { return m_mode == comm_mode::i2c; }
   bool is_gpio_mode() const { return m_mode == comm_mode::gpio; }
 
-  //探测设备是否在线、是否能正常通信
-  HAL_StatusTypeDef probe(
-      std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
+  // 探测设备是否在线、是否能正常通信
+  HAL_StatusTypeDef
+  probe(std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
 
   // 统一返回：bit=1 表示检测到目标线，一次性读取所有的数组
   HAL_StatusTypeDef read_line_mask(
       uint8_t &mask,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-//放进数组
+
+  // 放进数组
   HAL_StatusTypeDef read_line_array(
       std::array<uint8_t, channel_count> &states,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-//单通道的识别
+
+  // 单通道的识别
   HAL_StatusTypeDef read_channel_line(
       uint8_t channel, uint8_t &detected,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
 
   // 仅 I2C 模式支持
-  //读取单通道的灰度模拟值
+  // 读取单通道的灰度模拟值
   HAL_StatusTypeDef read_channel_gray(
       uint8_t channel, uint16_t &gray,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-    //读取单通道的阈值
+
+  // 读取单通道的阈值
   HAL_StatusTypeDef read_channel_threshold(
       uint8_t channel, uint16_t &threshold,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-//读取所有通道的灰度模拟值
+
+  // 读取所有通道的灰度模拟值
   HAL_StatusTypeDef read_all_gray(
       std::array<uint16_t, channel_count> &gray,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-//读取所有通道的阈值
+
+  // 读取所有通道的阈值
   HAL_StatusTypeDef read_all_threshold(
       std::array<uint16_t, channel_count> &threshold,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
-//读取所有通道的灰度模拟值和阈值
+
+  // 读取所有通道的灰度模拟值和阈值
   HAL_StatusTypeDef read_snapshot(
-      snapshot &data, bool with_gray = true, bool with_threshold = false,
+      snapshot_gpio &data, bool with_gray = true, bool with_threshold = false,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
+
+  HAL_StatusTypeDef read_snapshot(
+      snapshot_i2c &data, bool with_gray = true, bool with_threshold = false,
       std::chrono::milliseconds timeout = std::chrono::milliseconds(20));
 
 private:
@@ -122,8 +152,8 @@ private:
     return static_cast<uint8_t>(reg_threshold_ch1 + (channel - 1U) * 2U);
   }
 
-  static uint8_t make_mask_from_array(
-      const std::array<uint8_t, channel_count> &states);
+  static uint8_t
+  make_mask_from_array(const std::array<uint8_t, channel_count> &states);
 
   HAL_StatusTypeDef i2c_read_u8(
       uint8_t reg, uint8_t &value,
@@ -137,7 +167,7 @@ private:
   HAL_StatusTypeDef gpio_read_out(GPIO_PinState &pin_state);
 
 private:
-  comm_mode m_mode{comm_mode::i2c};
+  comm_mode m_mode{comm_mode::null};
   gdut::i2c *m_i2c{nullptr};
   uint16_t m_i2c_hal_addr{i2c_addr_hal};
   gpio_bus m_gpio{};
