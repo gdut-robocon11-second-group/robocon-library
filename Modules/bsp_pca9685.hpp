@@ -3,7 +3,6 @@
 
 #include "bsp_iic.hpp"
 #include "clock.hpp"
-#include "cmsis_os2.h"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -14,21 +13,16 @@ class pca9685 {
 public:
   static constexpr std::uint8_t channel_count = 16; // 16路输出
   static constexpr std::uint16_t resolution = 4096; // 4096步分辨率
-  static constexpr float internal_oscillator_hz =
-      25000000.0f; // 25MHz内部振荡器
+  static constexpr float internal_oscillator_hz = 25000000.0f; // 25MHz内部振荡器
 
   // PCA9685 默认 7bit 地址是 0x40（不含读写位）
   // 设备地址要左移 1 位，留读写位
   static constexpr std::uint8_t default_address_7bit = 0x40;
   static constexpr std::uint16_t default_address = (default_address_7bit << 1);
 
-  pca9685() = default;
-
-  pca9685(
-      gdut::i2c &bus, std::uint16_t dev_addr = default_address,
-      gdut::function<void(std::uint32_t)> delay_callback =
-          [](::std::uint32_t ms) { osDelay(ms); }) noexcept
-      : m_bus(&bus), m_dev_addr(dev_addr), m_delay_callback(delay_callback) {}
+  explicit pca9685(gdut::i2c &bus,
+                   std::uint16_t dev_addr = default_address) noexcept
+      : m_bus(&bus), m_dev_addr(dev_addr) {}
 
   ~pca9685() noexcept = default;
 
@@ -37,23 +31,13 @@ public:
   pca9685(pca9685 &&) = delete;
   pca9685 &operator=(pca9685 &&) = delete;
 
-  void set_parameters(
-      gdut::i2c &bus, std::uint16_t dev_addr = default_address,
-      gdut::function<void(std::uint32_t)> delay_callback =
-          [](::std::uint32_t ms) { osDelay(ms); }) noexcept {
-    m_bus = &bus;
-    m_dev_addr = dev_addr;
-    m_delay_callback = delay_callback;
-  }
-
   // 初始化：配置 MODE1 / MODE2，并设置 PWM 频率
   HAL_StatusTypeDef init(float pwm_freq_hz = 50.0f);
 
   // 探测设备是否存在
-  // timeout 表示单次探测的超时时间，单位为毫秒；该参数传递给底层
-  // i2c::is_device_ready
   HAL_StatusTypeDef
   is_ready(std::uint32_t trials = 3,
+           // 应该是这样用的，我忘了，可能会错
            std::chrono::milliseconds timeout = std::chrono::milliseconds(10));
 
   // 频率配置，所有的pwm都是同一个频率
@@ -69,7 +53,7 @@ public:
                                     std::uint16_t size);
 
   // 通道原始 PWM 设置
-  HAL_StatusTypeDef set_pwm_opened(std::uint8_t channel, std::uint16_t on,
+  HAL_StatusTypeDef set_pwm(std::uint8_t channel, std::uint16_t on,
                             std::uint16_t off);
 
   // 直接按 0~4095 设置占空值
@@ -88,7 +72,7 @@ public:
   HAL_StatusTypeDef set_servo_angle(std::uint8_t channel, float angle_deg,
                                     float min_pulse_us = 500.0f,
                                     float max_pulse_us = 2500.0f,
-                                    float max_angle_deg = 270.0f);
+                                    float max_angle_deg = 180.0f);
 
   // 休眠 / 唤醒
   HAL_StatusTypeDef sleep();
@@ -152,8 +136,6 @@ private:
   gdut::i2c *m_bus{nullptr};
   std::uint16_t m_dev_addr{default_address};
   float m_pwm_freq_hz{50.0f};
-  // 需要一个 ms 级别的延时函数，单位为毫秒
-  gdut::function<void(std::uint32_t)> m_delay_callback;
 };
 
 } // namespace gdut

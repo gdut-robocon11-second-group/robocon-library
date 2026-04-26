@@ -130,6 +130,7 @@ public:
                 },
                 static_cast<void *>(data), &attributes)};
     if (!m_handle) {
+      std::terminate();
       allocator.template destroy<bound_type>(data);
       {
         std::lock_guard lock(thread_memory_resource::pool_mutex);

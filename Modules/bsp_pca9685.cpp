@@ -1,8 +1,6 @@
 #include "bsp_pca9685.hpp"
 
-#include "cmsis_os2.h"
 #include "stm32f4xx_hal.h"
-
 
 namespace gdut {
 // 芯片有指定的频率范围，这里对频率进行裁剪
@@ -107,11 +105,7 @@ HAL_StatusTypeDef pca9685::init(float pwm_freq_hz) {
     return status;
   }
 
-  if (m_delay_callback) {
-    m_delay_callback(1);
-  } else {
-    osDelay(1);
-  }
+  HAL_Delay(1);
 
   status = set_pwm_freq(pwm_freq_hz);
   if (status != HAL_OK) {
@@ -130,11 +124,7 @@ HAL_StatusTypeDef pca9685::wakeup() {
   }
 
   // 官方手册给的是振荡器起来最多 500us，这里留 1ms 更稳
-  if (m_delay_callback) {
-    m_delay_callback(1);
-  } else {
-    osDelay(1);
-  }
+  HAL_Delay(1);
 
   // 写 1 到 RESTART 位以重启 PWM 逻辑
   return update_mode1_bits(mode1_restart, 0);
@@ -185,8 +175,8 @@ HAL_StatusTypeDef pca9685::set_pwm_freq(float freq_hz) {
   m_pwm_freq_hz = freq_hz;
   return HAL_OK;
 }
-
-HAL_StatusTypeDef pca9685::set_pwm_opened(uint8_t channel, uint16_t on, uint16_t off) {
+// 从0n开始高，off开始低
+HAL_StatusTypeDef pca9685::set_pwm(uint8_t channel, uint16_t on, uint16_t off) {
   if (channel >= channel_count) {
     return HAL_ERROR;
   }
@@ -237,24 +227,24 @@ HAL_StatusTypeDef pca9685::set_duty(std::uint8_t channel, std::uint16_t duty,
 
   if (!invert) {
     if (duty == 0U) {
-      return set_pwm_opened(channel, 0, 4096); // full off
+      return set_pwm(channel, 0, 4096); // full off
     }
     if (duty >= 4095U) {
-      return set_pwm_opened(channel, 4096, 0); // full on
+      return set_pwm(channel, 4096, 0); // full on
     }
-    return set_pwm_opened(channel, 0, duty);
+    return set_pwm(channel, 0, duty);
   }
 
   // 反相模式
   if (duty == 0U) {
-    return set_pwm_opened(channel, 4096, 0);
+    return set_pwm(channel, 4096, 0);
   }
   if (duty >= 4095U) {
-    return set_pwm_opened(channel, 0, 4096);
+    return set_pwm(channel, 0, 4096);
   }
-  return set_pwm_opened(channel, 0, static_cast<uint16_t>(4095U - duty));
+  return set_pwm(channel, 0, static_cast<uint16_t>(4095U - duty));
 }
-
+// 单位是微秒，把舵机脉宽转化为芯片的0-4095
 HAL_StatusTypeDef pca9685::set_servo_pulse_us(uint8_t channel, float pulse_us) {
   if (channel >= channel_count) {
     return HAL_ERROR;
@@ -263,7 +253,7 @@ HAL_StatusTypeDef pca9685::set_servo_pulse_us(uint8_t channel, float pulse_us) {
     return HAL_ERROR;
   }
 
-  // 周期 us = 1e6 / f
+  // 周期 us = 1e6 / f，因为m_pwm_freq_hz为频率，单位是khz
   const float period_us = 1000000.0f / m_pwm_freq_hz;
   float ticks_f = (pulse_us / period_us) * static_cast<float>(resolution);
 
@@ -275,10 +265,9 @@ HAL_StatusTypeDef pca9685::set_servo_pulse_us(uint8_t channel, float pulse_us) {
   }
 
   const uint16_t ticks = static_cast<uint16_t>(ticks_f + 0.5f);
-  return set_pwm_opened(channel, 0, ticks);
+  return set_pwm(channel, 0, ticks);
 }
-// 度数接口,min_pulse_us 和 max_pulse_us 分别对应 0° 和 max_angle_deg° 的脉宽，线性插值
-//min_pulse_us,500us，最大的对应 2500us，但实际使用时可能需要微调以适配舵机的实际范围和性能
+// 度数接口，angle_deg为角度，min_pulse_us为最小角度的脉冲，max_pulse_us为最大角度的脉冲，max_angle_deg为最大角度
 HAL_StatusTypeDef pca9685::set_servo_angle(std::uint8_t channel,
                                            float angle_deg, float min_pulse_us,
                                            float max_pulse_us,

@@ -254,7 +254,7 @@ public:
     std::pmr::vector<std::uint8_t>(pmr::portable_resource::get_instance())
         .swap(m_message_buffer);
     m_processing_thread =
-        thread<2048, osPriorityRealtime>("atk_ms901m", [this]() {
+        thread<2048, osPriorityHigh>("atk_ms901m", [this]() {
           while (true) {
             message_buffer buf;
             if (m_message_queue.receive(buf)) {
@@ -386,6 +386,7 @@ protected:
                    header->length);
       m_message_buffer.erase(m_message_buffer.begin(),
                              m_message_buffer.begin() + frame_size);
+      osDelay(5); // 适当延时，让出处理器给其他任务，避免长时间占用 CPU
     }
   }
 
@@ -511,7 +512,7 @@ private:
   std::array<std::uint8_t, 512> m_rx_buffer{};
   std::pmr::vector<std::uint8_t> m_message_buffer;
   message_queue<message_buffer> m_message_queue{empty_message_queue};
-  thread<2048, osPriorityRealtime> m_processing_thread{empty_thread};
+  thread<2048, osPriorityHigh> m_processing_thread{empty_thread};
 };
 
 } // namespace gdut
