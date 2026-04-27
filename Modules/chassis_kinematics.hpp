@@ -9,7 +9,7 @@ namespace gdut {
  * @brief 底盘运动学类，提供机器人速度与轮速之间的正逆运动学计算方法
  * @tparam Radius 轮子到机器人中心的距离，单位为米
  */
-template <float Radius> class chassis_kinematics {
+template <float Radius> class universal_wheel_kinematics {
 public:
   static_assert(Radius > 0, "Radius must be greater than 0");
 
@@ -47,6 +47,42 @@ public:
   inverse_kinematics(const vector<float, 4> &wheel_velocities) {
     return inverse_kinematics_matrix * wheel_velocities;
   }
+};
+template<float Radius>
+using chassis_kinematics = universal_wheel_kinematics<Radius>;
+
+template<float Width, float Length>
+class mcanum_wheel_kinematics {
+public:
+  static_assert(Width > 0, "Width must be greater than 0");
+  static_assert(Length > 0, "Length must be greater than 0");
+
+  static constexpr float width = Width;
+  static constexpr float length = Length;
+  static constexpr float mid = 0.5f * (width + length);
+  
+  static constexpr matrix<float, 4, 3> forward_kinematics_matrix{
+      1.0f, 1.0f, mid,
+      1.0f, -1.0f, -mid,
+      1.0f, 1.0f, -mid,
+      1.0f, -1.0f, mid};
+
+  static constexpr matrix<float, 3, 4> inverse_kinematics_matrix{
+      1.0f / 4.0f, 1.0f / 4.0f, 1.0f / 4.0f, 1.0f / 4.0f,
+      1.0f / 4.0f, -1.0f / 4.0f, 1.0f / 4.0f, -1.0f / 4.0f,
+      1.0f / 4.0f / mid , -1.0f / 4.0f / mid, -1.0f / 4.0f / mid, 1.0f / 4.0f / mid
+  };
+
+  static vector<float, 4>
+  forward_kinematics(const vector<float, 3> &velocities) {
+    return forward_kinematics_matrix * velocities;
+  }
+
+  static vector<float, 3>
+  inverse_kinematics(const vector<float, 4> &wheel_velocities) {
+    return inverse_kinematics_matrix * wheel_velocities;
+  }
+
 };
 
 } // namespace gdut

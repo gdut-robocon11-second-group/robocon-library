@@ -109,7 +109,7 @@ cmake-gui .
 | [docs/BSP/](./docs/BSP/) | 硬件抽象层文档（UART、SPI、CAN、TIM、GPIO 等） |
 | [docs/Async/](./docs/Async/) | 异步与 RTOS 抽象文档（线程、互斥锁、信号量、事件、消息队列） |
 | [docs/Components/](./docs/Components/) | 通用组件文档（function、uncopyable、clock、memory_resource、pid_controller、utils_type_traits、verification_algorithm） |
-| [docs/Modules/](./docs/Modules/) | 功能模块文档（chassis_kinematics、transfer_protocol） |
+| [docs/Modules/](./docs/Modules/) | 功能模块文档（universal_wheel_kinematics、transfer_protocol） |
 
 ### 代码规范快速参考
 

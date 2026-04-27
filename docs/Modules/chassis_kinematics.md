@@ -5,7 +5,7 @@
 - **正运动学**：机器人速度 `->` 四轮轮速
 - **逆运动学**：四轮轮速 `->` 机器人速度
 
-核心类型为 `gdut::chassis_kinematics<Radius>`，使用编译期常量矩阵完成计算。
+核心类型为 `gdut::universal_wheel_kinematics<Radius>`，使用编译期常量矩阵完成计算。
 
 ## 核心设计
 
@@ -51,9 +51,9 @@ $$
 
 ### 基础示例
 ```cpp
-#include "chassis_kinematics.hpp"
+#include "universal_wheel_kinematics.hpp"
 
-using kinematics_t = gdut::chassis_kinematics<1>;
+using kinematics_t = gdut::universal_wheel_kinematics<1>;
 
 gdut::vector<float, 3> cmd{1.0f, 0.0f, 0.3f}; // vx, vy, omega
 auto wheel_vel = kinematics_t::forward_kinematics(cmd);
@@ -102,4 +102,4 @@ void chassis_control_step(float vx_cmd, float vy_cmd, float wz_cmd) {
 - 模块只负责运动学映射，不包含动力学补偿与摩擦补偿。
 
 相关源码：
-- [Modules/chassis_kinematics.hpp](../../Modules/chassis_kinematics.hpp)
+- [Modules/universal_wheel_kinematics.hpp](../../Modules/universal_wheel_kinematics.hpp)
